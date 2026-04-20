@@ -1,0 +1,320 @@
+'use client'
+// src/app/login/LoginForm.tsx
+// Client Component — único lugar onde useSearchParams é usado
+
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
+type Mode = 'login' | 'signup' | 'reset'
+
+const ERRORS: Record<string, string> = {
+  'Invalid login credentials':            'E-mail ou senha incorretos.',
+  'Email not confirmed':                  'Confirme seu e-mail antes de entrar.',
+  'User already registered':              'Este e-mail já está cadastrado.',
+  'Email rate limit exceeded':            'Muitas tentativas. Aguarde alguns minutos.',
+  'Password should be at least 6':        'A senha deve ter pelo menos 6 caracteres.',
+  'For security purposes':               'Aguarde alguns segundos e tente novamente.',
+  'auth_callback_error':                  'Link inválido ou expirado. Tente novamente.',
+}
+
+function translateError(msg: string): string {
+  for (const [key, value] of Object.entries(ERRORS)) {
+    if (msg.includes(key)) return value
+  }
+  return 'Ocorreu um erro inesperado. Tente novamente.'
+}
+
+export default function LoginForm() {
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const supabase     = createClient()
+
+  const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
+
+  const [mode,     setMode]     = useState<Mode>('login')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [name,     setName]     = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [success,  setSuccess]  = useState<string | null>(null)
+
+  // Erro vindo do callback (/login?error=auth_callback_error)
+  useEffect(() => {
+    const e = searchParams.get('error')
+    if (e) setError(translateError(e))
+  }, [searchParams])
+
+  function reset() { setError(null); setSuccess(null) }
+  function switchMode(m: Mode) { reset(); setMode(m) }
+
+  // ── Login ──────────────────────────────────────────────────
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    reset()
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    })
+
+    if (error) {
+      setError(translateError(error.message))
+      setLoading(false)
+      return
+    }
+
+    router.push(redirectTo)
+    router.refresh()
+  }
+
+  // ── Signup ─────────────────────────────────────────────────
+  async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    reset()
+
+    if (password.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.')
+      setLoading(false)
+      return
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data:             { full_name: name.trim() },
+        emailRedirectTo:  `${window.location.origin}/auth/callback`,
+      },
+    })
+
+    if (error) {
+      setError(translateError(error.message))
+      setLoading(false)
+      return
+    }
+
+    setSuccess('Conta criada! Verifique seu e-mail para confirmar o cadastro.')
+    setLoading(false)
+  }
+
+  // ── Reset de senha ─────────────────────────────────────────
+  async function handleReset(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    reset()
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/auth/callback?next=/profile/reset-password`,
+    })
+
+    if (error) {
+      setError(translateError(error.message))
+    } else {
+      setSuccess('E-mail enviado! Verifique sua caixa de entrada.')
+    }
+    setLoading(false)
+  }
+
+  const submitHandler =
+    mode === 'login'  ? handleLogin  :
+    mode === 'signup' ? handleSignup :
+    handleReset
+
+  // ── UI ─────────────────────────────────────────────────────
+  return (
+    <div className="bg-white py-8 px-6 shadow-sm rounded-2xl border border-gray-100 sm:px-10">
+
+      {/* Tabs login / cadastro */}
+      {mode !== 'reset' && (
+        <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
+          {(['login', 'signup'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => switchMode(m)}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === m
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {m === 'login' ? 'Entrar' : 'Criar conta'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Reset de senha — título */}
+      {mode === 'reset' && (
+        <div className="mb-6">
+          <h2 className="text-base font-semibold text-gray-900">Redefinir senha</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Informe seu e-mail e enviaremos um link de redefinição.
+          </p>
+        </div>
+      )}
+
+      {/* Feedback */}
+      {success && (
+        <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+          <p className="text-sm text-teal-800">{success}</p>
+        </div>
+      )}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Formulário */}
+      <form onSubmit={submitHandler} noValidate className="space-y-4">
+
+        {/* Nome — só no cadastro */}
+        {mode === 'signup' && (
+          <Field label="Nome completo" htmlFor="name">
+            <Input
+              id="name" type="text" autoComplete="name"
+              required placeholder="Seu nome completo"
+              value={name} onChange={(v) => setName(v)}
+            />
+          </Field>
+        )}
+
+        {/* E-mail */}
+        <Field label="E-mail" htmlFor="email"
+          action={mode === 'login'
+            ? <button type="button" onClick={() => switchMode('reset')}
+                className="text-xs text-teal-700 hover:text-teal-900 transition-colors">
+                Esqueceu a senha?
+              </button>
+            : undefined
+          }
+        >
+          <Input
+            id="email" type="email" autoComplete="email"
+            required placeholder="seu@email.com"
+            value={email} onChange={(v) => setEmail(v)}
+          />
+        </Field>
+
+        {/* Senha — oculto no modo reset */}
+        {mode !== 'reset' && (
+          <Field label="Senha" htmlFor="password">
+            <Input
+              id="password" type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              required placeholder={mode === 'signup' ? 'Mínimo 8 caracteres' : '••••••••'}
+              value={password} onChange={(v) => setPassword(v)}
+            />
+          </Field>
+        )}
+
+        {/* Termos — só no cadastro */}
+        {mode === 'signup' && (
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Ao criar uma conta você concorda que este app é educacional e
+            não substitui orientação médica profissional.
+          </p>
+        )}
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     text-white text-sm font-medium rounded-lg
+                     transition-all focus:outline-none focus:ring-2
+                     focus:ring-teal-500 focus:ring-offset-2"
+        >
+          {loading
+            ? <Spinner label={mode === 'login' ? 'Entrando…' : mode === 'signup' ? 'Criando conta…' : 'Enviando…'} />
+            : mode === 'login'  ? 'Entrar'
+            : mode === 'signup' ? 'Criar conta'
+            : 'Enviar link de redefinição'
+          }
+        </button>
+      </form>
+
+      {/* Rodapé */}
+      <div className="mt-6 text-center text-xs text-gray-400">
+        {mode === 'reset' ? (
+          <button onClick={() => switchMode('login')}
+            className="text-teal-700 hover:text-teal-900 font-medium">
+            ← Voltar para o login
+          </button>
+        ) : mode === 'login' ? (
+          <span>Não tem conta?{' '}
+            <button onClick={() => switchMode('signup')}
+              className="text-teal-700 hover:text-teal-900 font-medium">
+              Cadastre-se grátis
+            </button>
+          </span>
+        ) : (
+          <span>Já tem conta?{' '}
+            <button onClick={() => switchMode('login')}
+              className="text-teal-700 hover:text-teal-900 font-medium">
+              Faça login
+            </button>
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Primitivos reutilizáveis ───────────────────────────────────
+
+interface FieldProps {
+  label: string
+  htmlFor: string
+  action?: React.ReactNode
+  children: React.ReactNode
+}
+
+function Field({ label, htmlFor, action, children }: FieldProps) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700">
+          {label}
+        </label>
+        {action}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+  onChange: (value: string) => void
+}
+
+function Input({ onChange, ...props }: InputProps) {
+  return (
+    <input
+      {...props}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
+                 placeholder-gray-400 focus:outline-none focus:ring-2
+                 focus:ring-teal-500 focus:border-transparent transition-all"
+    />
+  )
+}
+
+function Spinner({ label }: { label: string }) {
+  return (
+    <span className="flex items-center justify-center gap-2">
+      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10"
+          stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+      </svg>
+      {label}
+    </span>
+  )
+}
