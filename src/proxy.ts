@@ -21,7 +21,7 @@ const PROTECTED_ROUTES = [
 // Rotas de autenticação — redireciona para /dashboard se já logado
 const AUTH_ROUTES = ['/login', '/signup']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
