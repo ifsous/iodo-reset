@@ -43,11 +43,12 @@ export async function GET(request: NextRequest) {
 
     if (!error && data.user) {
       // Verifica se o usuário já tem perfil/onboarding completo
+      // Tipo explícito necessário para o TypeScript inferir onboarding_done
       const { data: userData } = await supabase
         .from('users')
         .select('onboarding_done')
         .eq('id', data.user.id)
-        .single()
+        .single<{ onboarding_done: boolean }>()
 
       // Redireciona para onboarding se ainda não completou
       if (userData && !userData.onboarding_done) {

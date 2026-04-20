@@ -21,7 +21,7 @@ const PROTECTED_ROUTES = [
 // Rotas de autenticação — redireciona para /dashboard se já logado
 const AUTH_ROUTES = ['/login', '/signup']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -86,7 +86,7 @@ export async function middleware(request: NextRequest) {
       .from('users')
       .select('onboarding_done')
       .eq('id', user.id)
-      .single<{ onboarding_done: boolean }>()
+      .single()
 
     if (userData && !userData.onboarding_done) {
       const redirectUrl = request.nextUrl.clone()
