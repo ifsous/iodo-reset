@@ -4,7 +4,7 @@
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DiaryForm        from './DiaryForm'
-import type { SemaphoreColor } from '@/lib/supabase/types'
+import type { SemaphoreColor, SymptomType } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Registrar hoje — IODO RESET',
@@ -16,7 +16,7 @@ export interface ExistingLog {
   energy:        number | null
   mood:          number | null
   sleep_quality: number | null
-  symptoms:      string[]
+  symptoms:      SymptomType[]
   took_iodine:   boolean
   took_selenium: boolean
   took_magnesium:boolean

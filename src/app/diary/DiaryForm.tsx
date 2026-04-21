@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { useRouter }           from 'next/navigation'
 import { createClient }        from '@/lib/supabase/client'
 import type { ExistingLog }    from './page'
-import type { SemaphoreColor } from '@/lib/supabase/types'
+import type { SemaphoreColor, SymptomType } from '@/lib/supabase/types'
 
 // ── Props ─────────────────────────────────────────────────────
 interface Props {
@@ -46,7 +46,7 @@ function calcSemaphore(
 }
 
 // ── Config de sintomas ────────────────────────────────────────
-const SYMPTOMS = [
+const SYMPTOMS: { value: SymptomType; label: string }[] = [
   { value: 'headache',             label: 'Dor de cabeça'     },
   { value: 'acne',                 label: 'Acne / espinhas'   },
   { value: 'extra_fatigue',        label: 'Cansaço extra'     },
@@ -137,7 +137,7 @@ export default function DiaryForm({
   const [energy,   setEnergy]  = useState(existing?.energy        ?? 7)
   const [mood,     setMood]    = useState(existing?.mood          ?? 7)
   const [sleep,    setSleep]   = useState(existing?.sleep_quality ?? 7)
-  const [symptoms, setSymptoms] = useState<string[]>(existing?.symptoms ?? [])
+  const [symptoms, setSymptoms] = useState<SymptomType[]>(existing?.symptoms ?? [])
   const [checks,   setChecks]  = useState<Record<CheckKey, boolean>>({
     took_iodine:    existing?.took_iodine    ?? false,
     took_selenium:  existing?.took_selenium  ?? false,
@@ -158,7 +158,7 @@ export default function DiaryForm({
   const sem           = SEM[semaphore]
 
   // Lida com seleção de sintomas (nenhum é exclusivo)
-  function toggleSymptom(val: string) {
+  function toggleSymptom(val: SymptomType) {
     if (val === 'none') {
       setSymptoms(symptoms.includes('none') ? [] : ['none'])
       return
