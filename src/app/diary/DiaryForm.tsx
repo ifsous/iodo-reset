@@ -185,6 +185,7 @@ export default function DiaryForm({
       user_id:       userId,
       log_date:      today,
       dose_drops:    drops,
+      dose_mg:       drops * 0.05,
       energy,
       mood,
       sleep_quality: sleep,
@@ -201,10 +202,40 @@ export default function DiaryForm({
       is_edited:     !!existing,
     }
 
-    // Upsert — cria ou atualiza o registro do dia
-    const { error: dbError } = await supabase
-      .from('daily_logs')
-      .upsert(payload, { onConflict: 'user_id,log_date' })
+    // Salva o registro — insert se novo, update se já existe
+    let dbError = null
+
+    if (existing) {
+      // Atualiza o registro existente
+      const { error } = await supabase
+        .from('daily_logs')
+        .update({
+          dose_drops:    payload.dose_drops,
+          energy:        payload.energy,
+          mood:          payload.mood,
+          sleep_quality: payload.sleep_quality,
+          symptoms:      payload.symptoms,
+          took_iodine:    payload.took_iodine,
+          took_selenium:  payload.took_selenium,
+          took_magnesium: payload.took_magnesium,
+          took_vitamins:  payload.took_vitamins,
+          took_vitamin_c: payload.took_vitamin_c,
+          drank_water:    payload.drank_water,
+          used_salt:      payload.used_salt,
+          semaphore:      payload.semaphore,
+          notes:          payload.notes,
+          is_edited:      true,
+        })
+        .eq('user_id', userId)
+        .eq('log_date', today)
+      dbError = error
+    } else {
+      // Cria novo registro
+      const { error } = await supabase
+        .from('daily_logs')
+        .insert(payload)
+      dbError = error
+    }
 
     if (dbError) {
       setError('Erro ao salvar. Tente novamente.')

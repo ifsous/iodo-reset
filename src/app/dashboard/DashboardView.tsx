@@ -6,6 +6,16 @@ import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
 import type { SemaphoreColor, ProtocolPhase } from '@/lib/supabase/types'
 
+import AnalysisCard from '@/components/AnalysisCard'
+
+// Dentro do JSX, após os cards de métricas:
+<AnalysisCard
+  logId={data.lastLog?.id ?? null}
+  hasLog={hasLogToday}
+  isPro={false}       // substituir por data.plan === 'pro' quando tiver Stripe
+  analyses={0}        // buscar do banco depois
+/>
+
 // ── Helpers ───────────────────────────────────────────────────
 
 function daysInProtocol(startDate: string | null): number {
