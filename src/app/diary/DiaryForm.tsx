@@ -6,7 +6,9 @@ import { useState, useEffect } from 'react'
 import { useRouter }           from 'next/navigation'
 import { createClient }        from '@/lib/supabase/client'
 import type { ExistingLog }    from './page'
-import type { SemaphoreColor, SymptomType } from '@/lib/supabase/types'
+import type { Database, SemaphoreColor, SymptomType } from '@/lib/supabase/types'
+
+type LogInsert = Database['public']['Tables']['daily_logs']['Insert']
 
 // ── Props ─────────────────────────────────────────────────────
 interface Props {
@@ -179,7 +181,7 @@ export default function DiaryForm({
     setSaving(true)
     setError(null)
 
-    const payload = {
+    const payload: LogInsert = {
       user_id:       userId,
       log_date:      today,
       dose_drops:    drops,
