@@ -6,12 +6,15 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { Database } from '@/lib/supabase/types'
 
-export async function createClient() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = any
+
+export async function createClient(): Promise<AnySupabaseClient> {
   // cookies() deve ser chamado antes de qualquer chamada ao Supabase
   // para garantir que os dados não sejam cacheados pelo Next.js
   const cookieStore = await cookies()
 
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -38,10 +41,10 @@ export async function createClient() {
 // Cliente com service_role — bypassa RLS completamente
 // Use APENAS em rotas de API protegidas no servidor (ex: /api/analyze)
 // NUNCA exponha no frontend
-export async function createServiceClient() {
+export async function createServiceClient(): Promise<AnySupabaseClient> {
   const cookieStore = await cookies()
 
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {

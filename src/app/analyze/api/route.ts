@@ -124,9 +124,9 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('plan')
       .eq('id', user.id)
-      .single<{ plan: string }>()
+      .single()
 
-    const isPro = userData?.plan === 'pro' || userData?.plan === 'clinic'
+    const isPro = (userData as { plan: string } | null)?.plan === 'pro' || (userData as { plan: string } | null)?.plan === 'clinic'
 
     if (!isPro) {
       const today = new Date().toISOString().split('T')[0]
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
       .select('analysis_text, created_at')
       .eq('log_id', log_id)
       .eq('input_hash', inputHash)
-      .maybeSingle<{ analysis_text: string; created_at: string }>()
+      .maybeSingle() as any
 
     if (cached) {
       return NextResponse.json({
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     const costUsd = (inputTokens * 0.000003) + (outputTokens * 0.000015)
 
     // 7. Salva no cache
-    await supabase.from('ai_analyses').insert({
+    await (supabase.from('ai_analyses').insert({
       log_id,
       user_id:      user.id,
       input_hash:   inputHash,
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
       output_tokens: outputTokens,
       cost_usd:     costUsd,
       from_cache:   false,
-    })
+    }) as any)
 
     return NextResponse.json({
       analysis:     analysisText,

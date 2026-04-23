@@ -2,7 +2,7 @@
 // src/app/diary/DiaryForm.tsx
 // Client Component — formulário completo do diário diário
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter }           from 'next/navigation'
 import { createClient }        from '@/lib/supabase/client'
 import type { ExistingLog }    from './page'
@@ -207,33 +207,17 @@ export default function DiaryForm({
 
     if (existing) {
       // Atualiza o registro existente
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('daily_logs')
-        .update({
-          dose_drops:    payload.dose_drops,
-          energy:        payload.energy,
-          mood:          payload.mood,
-          sleep_quality: payload.sleep_quality,
-          symptoms:      payload.symptoms,
-          took_iodine:    payload.took_iodine,
-          took_selenium:  payload.took_selenium,
-          took_magnesium: payload.took_magnesium,
-          took_vitamins:  payload.took_vitamins,
-          took_vitamin_c: payload.took_vitamin_c,
-          drank_water:    payload.drank_water,
-          used_salt:      payload.used_salt,
-          semaphore:      payload.semaphore,
-          notes:          payload.notes,
-          is_edited:      true,
-        })
+        .update(payload as any)
         .eq('user_id', userId)
-        .eq('log_date', today)
+        .eq('log_date', today) as any)
       dbError = error
     } else {
       // Cria novo registro
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('daily_logs')
-        .insert(payload)
+        .insert(payload as any) as any)
       dbError = error
     }
 

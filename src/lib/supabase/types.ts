@@ -151,6 +151,7 @@ export interface Database {
           user_id: string
           log_date?: string
           dose_drops: number
+          dose_mg?: number
           energy?: number | null
           mood?: number | null
           sleep_quality?: number | null
