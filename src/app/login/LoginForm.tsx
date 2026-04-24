@@ -2,7 +2,7 @@
 // src/app/login/LoginForm.tsx
 // Client Component — único lugar onde useSearchParams é usado
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -31,6 +31,7 @@ export default function LoginForm() {
   const supabase     = createClient()
 
   const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
+  const callbackError = searchParams.get('error')
 
   const [mode,     setMode]     = useState<Mode>('login')
   const [email,    setEmail]    = useState('')
@@ -39,12 +40,6 @@ export default function LoginForm() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [success,  setSuccess]  = useState<string | null>(null)
-
-  // Erro vindo do callback (/login?error=auth_callback_error)
-  useEffect(() => {
-    const e = searchParams.get('error')
-    if (e) setError(translateError(e))
-  }, [searchParams])
 
   function reset() { setError(null); setSuccess(null) }
   function switchMode(m: Mode) { reset(); setMode(m) }
@@ -164,9 +159,9 @@ export default function LoginForm() {
           <p className="text-sm text-teal-800">{success}</p>
         </div>
       )}
-      {error && (
+      {(error || callbackError) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700">{error}</p>
+          <p className="text-sm text-red-700">{error ?? translateError(callbackError!)}</p>
         </div>
       )}
 
