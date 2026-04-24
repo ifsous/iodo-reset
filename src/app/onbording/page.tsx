@@ -12,6 +12,8 @@ export const metadata = {
   description: 'Responda algumas perguntas para personalizar seu protocolo de iodo.',
 }
 
+type OnboardingUserRow = { onboarding_done: boolean }
+
 // Skeleton simples para o Suspense
 function OnboardingSkeleton() {
   return (
@@ -42,9 +44,10 @@ export default async function OnboardingPage() {
     .from('users')
     .select('onboarding_done')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean }>()
+    .single()
 
-  if (userData?.onboarding_done) {
+  const typedUserData = userData as OnboardingUserRow | null
+  if (typedUserData?.onboarding_done) {
     redirect('/dashboard')
   }
 

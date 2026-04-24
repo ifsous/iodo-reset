@@ -4,10 +4,8 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { Database } from '@/lib/supabase/types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = any
+type AnySupabaseClient = ReturnType<typeof createServerClient>
 
 export async function createClient(): Promise<AnySupabaseClient> {
   // cookies() deve ser chamado antes de qualquer chamada ao Supabase
