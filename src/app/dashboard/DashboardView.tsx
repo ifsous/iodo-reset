@@ -1,28 +1,12 @@
 'use client'
-// src/app/dashboard/DashboardView.tsx
-// Client Component — toda a UI interativa do dashboard
-
 import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
 import type { SemaphoreColor, ProtocolPhase } from '@/lib/supabase/types'
-
 import AnalysisCard from '@/components/AnalysisCard'
-
-// Dentro do JSX, após os cards de métricas:
-<AnalysisCard
-  logId={data.lastLog?.id ?? null}
-  hasLog={hasLogToday}
-  isPro={false}       // substituir por data.plan === 'pro' quando tiver Stripe
-  analyses={0}        // buscar do banco depois
-/>
-
-// ── Helpers ───────────────────────────────────────────────────
 
 function daysInProtocol(startDate: string | null): number {
   if (!startDate) return 0
-  const start = new Date(startDate)
-  const today = new Date()
-  const diff  = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  const diff = Math.floor((new Date().getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))
   return Math.max(0, diff)
 }
 
@@ -46,11 +30,10 @@ const COFACTORS_BY_PHASE: Record<ProtocolPhase, string[]> = {
   '4': ['Selênio 200 mcg', 'Magnésio 400 mg', 'Vitamina C 2g', 'Vitaminas B2 + B3', 'Vitamina D3 + K2'],
 }
 
-// ── Semáforo ──────────────────────────────────────────────────
 const SEM_CONFIG: Record<SemaphoreColor, { bg: string; text: string; label: string; desc: string }> = {
-  green:  { bg: 'bg-emerald-500', text: 'text-emerald-700', label: 'Continuar protocolo',    desc: 'Tudo certo — siga com a dose atual.' },
-  yellow: { bg: 'bg-amber-400',   text: 'text-amber-700',   label: 'Atenção — mantenha dose', desc: 'Mantenha a dose e aumente água e sal.' },
-  red:    { bg: 'bg-red-500',     text: 'text-red-700',     label: 'Pausar 2 dias',           desc: 'Reduza a dose ou pause por 2 dias.' },
+  green:  { bg: 'bg-emerald-500', text: 'text-emerald-700', label: 'Continuar protocolo',    desc: 'Tudo certo — siga com a dose atual.'       },
+  yellow: { bg: 'bg-amber-400',   text: 'text-amber-700',   label: 'Atenção — mantenha dose', desc: 'Mantenha a dose e aumente água e sal.'     },
+  red:    { bg: 'bg-red-500',     text: 'text-red-700',     label: 'Pausar 2 dias',           desc: 'Reduza a dose ou pause por 2 dias.'        },
 }
 
 function SemaphoreIndicator({ color }: { color: SemaphoreColor }) {
@@ -66,7 +49,6 @@ function SemaphoreIndicator({ color }: { color: SemaphoreColor }) {
   )
 }
 
-// ── Metric Card ───────────────────────────────────────────────
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
@@ -77,9 +59,8 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
   )
 }
 
-// ── Mini bar chart ────────────────────────────────────────────
-function MiniBar({ value, max = 10, color }: { value: number | null; max?: number; color: string }) {
-  const pct = value ? Math.round((value / max) * 100) : 0
+function MiniBar({ value, color }: { value: number | null; color: string }) {
+  const pct = value ? Math.round((value / 10) * 100) : 0
   return (
     <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
       <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
@@ -87,7 +68,6 @@ function MiniBar({ value, max = 10, color }: { value: number | null; max?: numbe
   )
 }
 
-// ── Navigation bar ────────────────────────────────────────────
 function NavBar() {
   const router   = useRouter()
   const pathname = usePathname()
@@ -129,13 +109,9 @@ function NavBar() {
         {items.map((item) => {
           const active = pathname === item.path
           return (
-            <button
-              key={item.path}
-              onClick={() => router.push(item.path)}
+            <button key={item.path} onClick={() => router.push(item.path)}
               className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
-                active ? 'text-teal-700' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
+                active ? 'text-teal-700' : 'text-gray-400 hover:text-gray-600'}`}>
               {item.icon}
               <span className={`text-xs ${active ? 'font-medium' : ''}`}>{item.label}</span>
             </button>
@@ -146,20 +122,19 @@ function NavBar() {
   )
 }
 
-// ── Componente principal ──────────────────────────────────────
 export default function DashboardView({ data }: { data: DashboardData }) {
   const router = useRouter()
 
-  const days        = daysInProtocol(data.protocolStartDate)
-  const cofactors   = COFACTORS_BY_PHASE[data.phase]
-  const hasLogToday = data.lastLog ? isToday(data.lastLog.log_date) : false
-  const semaphore   = hasLogToday ? data.lastLog!.semaphore : 'green'
+  const days         = daysInProtocol(data.protocolStartDate)
+  const cofactors    = COFACTORS_BY_PHASE[data.phase]
+  const hasLogToday  = data.lastLog ? isToday(data.lastLog.log_date) : false
+  const semaphore    = hasLogToday ? data.lastLog!.semaphore : 'green'
   const hasChartData = data.recentLogs.length >= 2
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="bg-teal-700 pt-12 pb-6 px-4">
         <div className="max-w-lg mx-auto">
           <p className="text-teal-200 text-sm mb-1">Olá,</p>
@@ -175,9 +150,9 @@ export default function DashboardView({ data }: { data: DashboardData }) {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-1 space-y-4 pt-4">
+      <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
 
-        {/* ── Semáforo do dia ── */}
+        {/* Semáforo */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-gray-700">Status de hoje</p>
@@ -190,13 +165,9 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           <SemaphoreIndicator color={semaphore} />
         </div>
 
-        {/* ── Botão registrar hoje ── */}
-        <button
-          onClick={() => router.push('/diary')}
-          className="w-full bg-teal-700 hover:bg-teal-800 active:scale-[0.98]
-                     text-white font-medium py-4 rounded-xl text-base transition-all
-                     flex items-center justify-center gap-2 shadow-sm"
-        >
+        {/* Botão registrar */}
+        <button onClick={() => router.push('/diary')}
+          className="w-full bg-teal-700 hover:bg-teal-800 active:scale-[0.98] text-white font-medium py-4 rounded-xl text-base transition-all flex items-center justify-center gap-2 shadow-sm">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <circle cx="10" cy="10" r="8" stroke="white" strokeWidth="1.5"/>
             <path d="M10 6v8M6 10h8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
@@ -204,31 +175,17 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           {hasLogToday ? 'Editar registro de hoje' : 'Registrar hoje'}
         </button>
 
-        {/* ── Métricas ── */}
+        {/* Métricas */}
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard
-            label="Dose atual"
-            value={data.drops === 0 ? '—' : data.drops}
-            sub={data.drops === 0 ? 'sem iodo por ora' : `gota${data.drops > 1 ? 's' : ''} · ${(data.drops * 6.25).toFixed(1)}mg`}
-          />
-          <MetricCard
-            label="Dias no protocolo"
-            value={days}
-            sub={days === 0 ? 'início hoje' : `dia${days > 1 ? 's' : ''} desde o início`}
-          />
-          <MetricCard
-            label="Fase atual"
-            value={data.phase}
-            sub={PHASE_LABELS[data.phase]}
-          />
-          <MetricCard
-            label="Cofatores"
-            value={cofactors.length}
-            sub="recomendados hoje"
-          />
+          <MetricCard label="Dose atual" value={data.drops === 0 ? '—' : data.drops}
+            sub={data.drops === 0 ? 'sem iodo por ora' : `gota${data.drops > 1 ? 's' : ''} · ${(data.drops * 6.25).toFixed(1)}mg`} />
+          <MetricCard label="Dias no protocolo" value={days}
+            sub={days === 0 ? 'início hoje' : `dia${days > 1 ? 's' : ''} desde o início`} />
+          <MetricCard label="Fase atual" value={data.phase} sub={PHASE_LABELS[data.phase]} />
+          <MetricCard label="Cofatores" value={cofactors.length} sub="recomendados hoje" />
         </div>
 
-        {/* ── Último registro (se tiver) ── */}
+        {/* Último registro */}
         {data.lastLog && (
           <div className="bg-white rounded-xl border border-gray-100 p-4">
             <div className="flex items-center justify-between mb-3">
@@ -239,31 +196,35 @@ export default function DashboardView({ data }: { data: DashboardData }) {
             </div>
             <div className="space-y-2">
               {[
-                { label: 'Energia',  value: data.lastLog.energy,        color: 'bg-teal-500' },
-                { label: 'Humor',    value: data.lastLog.mood,          color: 'bg-purple-400' },
-                { label: 'Sono',     value: data.lastLog.sleep_quality, color: 'bg-blue-400'   },
+                { label: 'Energia', value: data.lastLog.energy,        color: 'bg-teal-500'   },
+                { label: 'Humor',   value: data.lastLog.mood,          color: 'bg-purple-400' },
+                { label: 'Sono',    value: data.lastLog.sleep_quality, color: 'bg-blue-400'   },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center gap-2">
                   <span className="text-xs text-gray-500 w-14">{label}</span>
                   <MiniBar value={value} color={color} />
-                  <span className="text-xs font-medium text-gray-600 w-4 text-right">
-                    {value ?? '—'}
-                  </span>
+                  <span className="text-xs font-medium text-gray-600 w-4 text-right">{value ?? '—'}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Evolução 7 dias ── */}
+        {/* Análise IA */}
+        <AnalysisCard
+          logId={data.lastLog?.id ?? null}
+          hasLog={hasLogToday}
+          isPro={false}
+          analyses={0}
+        />
+
+        {/* Evolução 7 dias */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <p className="text-sm font-medium text-gray-700 mb-3">Evolução — 7 dias</p>
-
           {hasChartData ? (
             <div className="space-y-2">
               {data.recentLogs.map((log) => {
-                const date = new Date(log.log_date + 'T12:00:00')
-                const label = date.toLocaleDateString('pt-BR', { weekday: 'short' })
+                const label = new Date(log.log_date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' })
                 return (
                   <div key={log.log_date} className="flex items-center gap-2">
                     <span className="text-xs text-gray-400 w-8 capitalize">{label}</span>
@@ -271,18 +232,12 @@ export default function DashboardView({ data }: { data: DashboardData }) {
                     <MiniBar value={log.mood}          color="bg-purple-400" />
                     <MiniBar value={log.sleep_quality} color="bg-blue-400"   />
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      log.semaphore === 'green'  ? 'bg-emerald-500' :
-                      log.semaphore === 'yellow' ? 'bg-amber-400'   : 'bg-red-500'
-                    }`} />
+                      log.semaphore === 'green' ? 'bg-emerald-500' : log.semaphore === 'yellow' ? 'bg-amber-400' : 'bg-red-500'}`} />
                   </div>
                 )
               })}
               <div className="flex gap-3 mt-2 pt-2 border-t border-gray-50">
-                {[
-                  { color: 'bg-teal-500',   label: 'Energia'  },
-                  { color: 'bg-purple-400', label: 'Humor'    },
-                  { color: 'bg-blue-400',   label: 'Sono'     },
-                ].map(({ color, label }) => (
+                {[['bg-teal-500','Energia'],['bg-purple-400','Humor'],['bg-blue-400','Sono']].map(([color, label]) => (
                   <div key={label} className="flex items-center gap-1">
                     <div className={`w-2 h-2 rounded-full ${color}`} />
                     <span className="text-xs text-gray-400">{label}</span>
@@ -294,29 +249,24 @@ export default function DashboardView({ data }: { data: DashboardData }) {
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center mb-3">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M3 14l4-5 4 3 4-7" stroke="#9CA3AF" strokeWidth="1.5"
-                    strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 14l4-5 4 3 4-7" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
               <p className="text-sm text-gray-500">Sem dados ainda</p>
-              <p className="text-xs text-gray-400 mt-1">
-                Faça pelo menos 2 registros para ver a evolução
-              </p>
+              <p className="text-xs text-gray-400 mt-1">Faça pelo menos 2 registros para ver a evolução</p>
             </div>
           )}
         </div>
 
-        {/* ── Cofatores de hoje ── */}
+        {/* Cofatores */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <p className="text-sm font-medium text-gray-700 mb-3">Cofatores de hoje</p>
           <div className="space-y-2">
             {cofactors.map((c, i) => (
               <div key={i} className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-md border border-teal-200 bg-teal-50
-                                flex items-center justify-center flex-shrink-0">
+                <div className="w-5 h-5 rounded-md border border-teal-200 bg-teal-50 flex items-center justify-center flex-shrink-0">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M1.5 5.5L4 8L8.5 3" stroke="#0F6E56" strokeWidth="1.5"
-                      strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1.5 5.5L4 8L8.5 3" stroke="#0F6E56" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
                 <span className="text-sm text-gray-700">{c}</span>
@@ -332,11 +282,9 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           )}
         </div>
 
-        {/* ── Aviso educacional ── */}
         <p className="text-xs text-gray-400 text-center pb-2">
           Conteúdo educacional · Não substitui orientação médica profissional
         </p>
-
       </div>
 
       <NavBar />
