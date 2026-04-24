@@ -2,7 +2,7 @@
 // src/app/login/LoginForm.tsx
 // Client Component — único lugar onde useSearchParams é usado
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -12,6 +12,8 @@ const ERRORS: Record<string, string> = {
   'Invalid login credentials':            'E-mail ou senha incorretos.',
   'Email not confirmed':                  'Confirme seu e-mail antes de entrar.',
   'User already registered':              'Este e-mail já está cadastrado.',
+  'Database error saving new user':       'Não foi possível criar sua conta agora. Tente novamente em alguns minutos.',
+  'Signups not allowed for this instance':'Criação de conta temporariamente desativada. Contate o suporte.',
   'Email rate limit exceeded':            'Muitas tentativas. Aguarde alguns minutos.',
   'Password should be at least 6':        'A senha deve ter pelo menos 6 caracteres.',
   'For security purposes':               'Aguarde alguns segundos e tente novamente.',
@@ -22,7 +24,7 @@ function translateError(msg: string): string {
   for (const [key, value] of Object.entries(ERRORS)) {
     if (msg.includes(key)) return value
   }
-  return 'Ocorreu um erro inesperado. Tente novamente.'
+  return `Ocorreu um erro inesperado: ${msg}`
 }
 
 export default function LoginForm() {
@@ -40,11 +42,8 @@ export default function LoginForm() {
   const [error,    setError]    = useState<string | null>(null)
   const [success,  setSuccess]  = useState<string | null>(null)
 
-  // Erro vindo do callback (/login?error=auth_callback_error)
-  useEffect(() => {
-    const e = searchParams.get('error')
-    if (e) setError(translateError(e))
-  }, [searchParams])
+  const callbackError = searchParams.get('error')
+  const visibleError = error ?? (callbackError ? translateError(callbackError) : null)
 
   function reset() { setError(null); setSuccess(null) }
   function switchMode(m: Mode) { reset(); setMode(m) }
@@ -164,9 +163,9 @@ export default function LoginForm() {
           <p className="text-sm text-teal-800">{success}</p>
         </div>
       )}
-      {error && (
+      {visibleError && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700">{error}</p>
+          <p className="text-sm text-red-700">{visibleError}</p>
         </div>
       )}
 
