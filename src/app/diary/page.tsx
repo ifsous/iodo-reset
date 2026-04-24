@@ -37,9 +37,9 @@ export default async function DiaryPage() {
   // Verifica onboarding
   const { data: userData } = await supabase
     .from('users')
-    .select('onboarding_done, full_name')
+    .select('onboarding_done')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean; full_name: string | null }>()
+    .single<{ onboarding_done: boolean }>()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
@@ -62,7 +62,6 @@ export default async function DiaryPage() {
   return (
     <DiaryForm
       userId={user.id}
-      userName={userData?.full_name?.split(' ')[0] ?? 'Você'}
       recommendedDrops={profile?.recommended_dose_drops ?? 1}
       existing={existing ?? null}
       today={today}

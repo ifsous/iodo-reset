@@ -2,7 +2,7 @@
 // src/app/login/LoginForm.tsx
 // Client Component — único lugar onde useSearchParams é usado
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -37,14 +37,11 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [name,     setName]     = useState('')
   const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
-  const [success,  setSuccess]  = useState<string | null>(null)
-
-  // Erro vindo do callback (/login?error=auth_callback_error)
-  useEffect(() => {
+  const [error,    setError]    = useState<string | null>(() => {
     const e = searchParams.get('error')
-    if (e) setError(translateError(e))
-  }, [searchParams])
+    return e ? translateError(e) : null
+  })
+  const [success,  setSuccess]  = useState<string | null>(null)
 
   function reset() { setError(null); setSuccess(null) }
   function switchMode(m: Mode) { reset(); setMode(m) }
