@@ -8,14 +8,6 @@ import type { SemaphoreColor, ProtocolPhase } from '@/lib/supabase/types'
 
 import AnalysisCard from '@/components/AnalysisCard'
 
-// Dentro do JSX, após os cards de métricas:
-<AnalysisCard
-  logId={data.lastLog?.id ?? null}
-  hasLog={hasLogToday}
-  isPro={false}       // substituir por data.plan === 'pro' quando tiver Stripe
-  analyses={0}        // buscar do banco depois
-/>
-
 // ── Helpers ───────────────────────────────────────────────────
 
 function daysInProtocol(startDate: string | null): number {
@@ -227,6 +219,13 @@ export default function DashboardView({ data }: { data: DashboardData }) {
             sub="recomendados hoje"
           />
         </div>
+
+        <AnalysisCard
+          logId={data.lastLog?.id ?? null}
+          hasLog={hasLogToday}
+          isPro={false} // substituir por data.plan === 'pro' quando tiver Stripe
+          analyses={0} // buscar do banco depois
+        />
 
         {/* ── Último registro (se tiver) ── */}
         {data.lastLog && (

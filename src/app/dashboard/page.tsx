@@ -18,6 +18,7 @@ export interface DashboardData {
   protocolStartDate:  string | null
   conditions:         string[]
   lastLog: {
+    id:            string
     semaphore:    SemaphoreColor
     energy:       number | null
     mood:         number | null
@@ -68,11 +69,12 @@ export default async function DashboardPage() {
   // Busca último registro diário
   const { data: lastLog } = await supabase
     .from('daily_logs')
-    .select('semaphore, energy, mood, sleep_quality, dose_drops, log_date')
+    .select('id, semaphore, energy, mood, sleep_quality, dose_drops, log_date')
     .eq('user_id', user.id)
     .order('log_date', { ascending: false })
     .limit(1)
     .maybeSingle<{
+      id: string
       semaphore: SemaphoreColor
       energy: number | null
       mood: number | null
