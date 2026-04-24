@@ -4,7 +4,6 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-// @ts-expect-error - Supabase generic types issue with @supabase/ssr
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
