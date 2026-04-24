@@ -5,28 +5,21 @@
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardView    from './DashboardView'
-import type { ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
+import type { Database, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Dashboard — Protocolo IODO RESET',
 }
 
-type DashboardUserRow = { full_name: string | null; onboarding_done: boolean }
-type DashboardProfileRow = {
-  phase: ProtocolPhase
-  recommended_dose_drops: number
-  protocol_start_date: string | null
-  conditions: string[]
-}
-type DashboardLastLogRow = {
-  id: string
-  semaphore: SemaphoreColor
-  energy: number | null
-  mood: number | null
-  sleep_quality: number | null
-  dose_drops: number | null
-  log_date: string
-}
+type DashboardUserRow = Pick<Database['public']['Tables']['users']['Row'], 'full_name' | 'onboarding_done'>
+type DashboardProfileRow = Pick<
+  Database['public']['Tables']['profiles']['Row'],
+  'phase' | 'recommended_dose_drops' | 'protocol_start_date' | 'conditions'
+>
+type DashboardLastLogRow = Pick<
+  Database['public']['Tables']['daily_logs']['Row'],
+  'id' | 'semaphore' | 'energy' | 'mood' | 'sleep_quality' | 'dose_drops' | 'log_date'
+>
 
 export interface DashboardData {
   userName:           string
