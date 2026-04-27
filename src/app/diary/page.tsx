@@ -35,29 +35,33 @@ export default async function DiaryPage() {
   if (!user) redirect('/login')
 
   // Verifica onboarding
-  const { data: userData } = await supabase
+  const { data: userData }: {
+    data: { onboarding_done: boolean; full_name: string | null } | null
+  } = await supabase
     .from('users')
     .select('onboarding_done, full_name')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean; full_name: string | null }>()
+    .single()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
   // Busca dose recomendada do perfil
-  const { data: profile } = await supabase
+  const { data: profile }: {
+    data: { recommended_dose_drops: number; phase: string } | null
+  } = await supabase
     .from('profiles')
     .select('recommended_dose_drops, phase')
     .eq('user_id', user.id)
-    .single<{ recommended_dose_drops: number; phase: string }>()
+    .single()
 
   // Busca registro de hoje (se existir)
   const today = new Date().toISOString().split('T')[0]
-  const { data: existing } = await supabase
+  const { data: existing }: { data: ExistingLog | null } = await supabase
     .from('daily_logs')
     .select('id, dose_drops, energy, mood, sleep_quality, symptoms, took_iodine, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt, notes, semaphore')
     .eq('user_id', user.id)
     .eq('log_date', today)
-    .maybeSingle<ExistingLog>()
+    .maybeSingle()
 
   return (
     <DiaryForm
