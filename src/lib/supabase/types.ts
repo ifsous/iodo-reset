@@ -82,6 +82,7 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -121,6 +122,7 @@ export interface Database {
           pro_notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
       }
       daily_logs: {
         Row: {
@@ -168,6 +170,7 @@ export interface Database {
           is_edited?: boolean
         }
         Update: Partial<Database['public']['Tables']['daily_logs']['Insert']>
+        Relationships: []
       }
       ai_analyses: {
         Row: {
@@ -202,6 +205,7 @@ export interface Database {
           from_cache?: boolean
         }
         Update: Partial<Database['public']['Tables']['ai_analyses']['Insert']>
+        Relationships: []
       }
       exams: {
         Row: {
@@ -242,6 +246,7 @@ export interface Database {
           pro_notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['exams']['Insert']>
+        Relationships: []
       }
       professionals: {
         Row: {
@@ -273,6 +278,7 @@ export interface Database {
           is_verified?: boolean
         }
         Update: Partial<Database['public']['Tables']['professionals']['Insert']>
+        Relationships: []
       }
       pro_patients: {
         Row: {
@@ -300,6 +306,7 @@ export interface Database {
           invite_accepted_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['pro_patients']['Insert']>
+        Relationships: []
       }
     }
     Views: {
@@ -322,6 +329,7 @@ export interface Database {
           last_mood: number | null
           last_dose_drops: number | null
         }
+        Relationships: []
       }
       v_user_weekly: {
         Row: {
@@ -336,6 +344,7 @@ export interface Database {
           yellow_days: number
           red_days: number
         }
+        Relationships: []
       }
     }
     Functions: {
@@ -358,5 +367,7 @@ export interface Database {
         Returns: Json
       }
     }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }

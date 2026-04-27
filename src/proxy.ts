@@ -86,7 +86,7 @@ export async function proxy(request: NextRequest) {
       .from('users')
       .select('onboarding_done')
       .eq('id', user.id)
-      .single<{ onboarding_done: boolean }>()
+      .single()
 
     if (userData && !userData.onboarding_done) {
       const redirectUrl = request.nextUrl.clone()

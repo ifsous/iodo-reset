@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         .from('users')
         .select('onboarding_done')
         .eq('id', data.user.id)
-        .single<{ onboarding_done: boolean }>()
+        .single()
 
       // Redireciona para onboarding se ainda não completou
       if (userData && !userData.onboarding_done) {

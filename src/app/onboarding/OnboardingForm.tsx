@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePhase, type PhaseResult } from '@/lib/protocol/calculatePhase'
+import type { SymptomType } from '@/lib/supabase/types'
 
 // ── Tipos internos ────────────────────────────────────────────
 interface FormData {
@@ -185,12 +186,12 @@ export default function OnboardingForm() {
       .upsert({
         user_id:                user.id,
         birth_year:             year,
-        sex:                    data.sex,
+        sex:                    (data.sex || null) as 'female' | 'male' | 'other' | null,
         conditions:             data.conditions,
         medications:            data.medications,
         prior_iodine_exp:       data.priorIodineExp ?? false,
         cofactors_in_use:       data.cofactorsInUse,
-        current_symptoms:       data.symptoms as never[],
+        current_symptoms:       data.symptoms as SymptomType[],
         main_goal:              data.mainGoal,
         phase:                  result.phase,
         protocol_start_date:    new Date().toISOString().split('T')[0],
