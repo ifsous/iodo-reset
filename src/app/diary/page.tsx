@@ -39,16 +39,20 @@ export default async function DiaryPage() {
     .from('users')
     .select('onboarding_done, full_name')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean; full_name: string | null }>()
+    .single()
 
-  if (!userData?.onboarding_done) redirect('/onboarding')
+  const typedUserData = userData as { onboarding_done: boolean; full_name: string | null } | null
+
+  if (!typedUserData?.onboarding_done) redirect('/onboarding')
 
   // Busca dose recomendada do perfil
   const { data: profile } = await supabase
     .from('profiles')
     .select('recommended_dose_drops, phase')
     .eq('user_id', user.id)
-    .single<{ recommended_dose_drops: number; phase: string }>()
+    .single()
+
+  const typedProfile = profile as { recommended_dose_drops: number; phase: string } | null
 
   // Busca registro de hoje (se existir)
   const today = new Date().toISOString().split('T')[0]
@@ -57,14 +61,16 @@ export default async function DiaryPage() {
     .select('id, dose_drops, energy, mood, sleep_quality, symptoms, took_iodine, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt, notes, semaphore')
     .eq('user_id', user.id)
     .eq('log_date', today)
-    .maybeSingle<ExistingLog>()
+    .maybeSingle()
+
+  const typedExisting = existing as ExistingLog | null
 
   return (
     <DiaryForm
       userId={user.id}
-      userName={userData?.full_name?.split(' ')[0] ?? 'Você'}
-      recommendedDrops={profile?.recommended_dose_drops ?? 1}
-      existing={existing ?? null}
+      userName={typedUserData?.full_name?.split(' ')[0] ?? 'Você'}
+      recommendedDrops={typedProfile?.recommended_dose_drops ?? 1}
+      existing={typedExisting}
       today={today}
     />
   )
