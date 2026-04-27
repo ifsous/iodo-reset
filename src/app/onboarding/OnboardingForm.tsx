@@ -202,7 +202,10 @@ export default function OnboardingForm() {
       }, { onConflict: 'user_id' })
 
     if (profileError) {
-      setError('Erro ao salvar perfil. Tente novamente.')
+      const details = [profileError.message, profileError.details, profileError.hint]
+        .filter(Boolean)
+        .join(' · ')
+      setError(`Erro ao salvar perfil. ${details || 'Tente novamente.'}`)
       setSaving(false)
       return
     }
