@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Busca contexto completo via função SQL do banco
-    const { data: contextData, error: contextError } = await supabase
+    const { data: contextData, error: contextError } = await (supabase as any)
       .rpc('get_ai_context', {
         p_user_id:   user.id,
         p_log_id:    log_id,
