@@ -14,7 +14,7 @@ export async function createClient(): Promise<AnySupabaseClient> {
   // para garantir que os dados não sejam cacheados pelo Next.js
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -44,7 +44,7 @@ export async function createClient(): Promise<AnySupabaseClient> {
 export async function createServiceClient(): Promise<AnySupabaseClient> {
   const cookieStore = await cookies()
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
