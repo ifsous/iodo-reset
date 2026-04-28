@@ -42,7 +42,7 @@ export default async function OnboardingPage() {
     .from('users')
     .select('onboarding_done')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean }>()
+    .single()
 
   if (userData?.onboarding_done) {
     redirect('/dashboard')

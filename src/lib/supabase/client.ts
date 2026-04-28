@@ -4,8 +4,10 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 
-// @ts-expect-error - Supabase generic types issue with @supabase/ssr
-export function createClient() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySupabaseClient = any
+
+export function createClient(): AnySupabaseClient {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
