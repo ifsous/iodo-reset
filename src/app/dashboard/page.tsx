@@ -48,7 +48,7 @@ export default async function DashboardPage() {
     .from('users')
     .select('full_name, onboarding_done')
     .eq('id', user.id)
-    .single<{ full_name: string | null; onboarding_done: boolean }>()
+    .single()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
@@ -57,12 +57,7 @@ export default async function DashboardPage() {
     .from('profiles')
     .select('phase, recommended_dose_drops, protocol_start_date, conditions')
     .eq('user_id', user.id)
-    .single<{
-      phase: ProtocolPhase
-      recommended_dose_drops: number
-      protocol_start_date: string | null
-      conditions: string[]
-    }>()
+    .single()
 
   if (!profile) redirect('/onboarding')
 
