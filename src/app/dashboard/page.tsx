@@ -44,36 +44,33 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
 
   // Busca dados do usuário
-  const { data: userData } = await supabase
+  const { data: userData }: { data: { full_name: string | null; onboarding_done: boolean } | null } = await supabase
     .from('users')
     .select('full_name, onboarding_done')
     .eq('id', user.id)
-    .single<{ full_name: string | null; onboarding_done: boolean }>()
+    .single()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
   // Busca perfil clínico
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('phase, recommended_dose_drops, protocol_start_date, conditions')
-    .eq('user_id', user.id)
-    .single<{
+  const { data: profile }: {
+    data: {
       phase: ProtocolPhase
       recommended_dose_drops: number
       protocol_start_date: string | null
       conditions: string[]
-    }>()
+    } | null
+  } = await supabase
+    .from('profiles')
+    .select('phase, recommended_dose_drops, protocol_start_date, conditions')
+    .eq('user_id', user.id)
+    .single()
 
   if (!profile) redirect('/onboarding')
 
   // Busca último registro diário
-  const { data: lastLog } = await supabase
-    .from('daily_logs')
-    .select('id, semaphore, energy, mood, sleep_quality, dose_drops, log_date')
-    .eq('user_id', user.id)
-    .order('log_date', { ascending: false })
-    .limit(1)
-    .maybeSingle<{
+  const { data: lastLog }: {
+    data: {
       id: string
       semaphore: SemaphoreColor
       energy: number | null
@@ -81,7 +78,14 @@ export default async function DashboardPage() {
       sleep_quality: number | null
       dose_drops: number | null
       log_date: string
-    }>()
+    } | null
+  } = await supabase
+    .from('daily_logs')
+    .select('id, semaphore, energy, mood, sleep_quality, dose_drops, log_date')
+    .eq('user_id', user.id)
+    .order('log_date', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   // Busca últimos 7 logs para o gráfico
   const { data: recentLogs } = await supabase
