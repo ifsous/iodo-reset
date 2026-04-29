@@ -103,7 +103,7 @@ function hashContext(context: Record<string, unknown>): string {
 // ── Handler principal ─────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createClient() as any
 
     // 1. Verifica autenticação
     const { data: { user } } = await supabase.auth.getUser()
