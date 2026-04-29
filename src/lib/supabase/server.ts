@@ -3,13 +3,13 @@
 // NUNCA importe este arquivo em Client Components ('use client')
 
 import { createServerClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from '@/lib/supabase/types'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnySupabaseClient = any
+type TypedSupabaseClient = SupabaseClient<Database>
 
-export async function createClient(): Promise<AnySupabaseClient> {
+export async function createClient(): Promise<TypedSupabaseClient> {
   // cookies() deve ser chamado antes de qualquer chamada ao Supabase
   // para garantir que os dados não sejam cacheados pelo Next.js
   const cookieStore = await cookies()
@@ -41,7 +41,7 @@ export async function createClient(): Promise<AnySupabaseClient> {
 // Cliente com service_role — bypassa RLS completamente
 // Use APENAS em rotas de API protegidas no servidor (ex: /api/analyze)
 // NUNCA exponha no frontend
-export async function createServiceClient(): Promise<AnySupabaseClient> {
+export async function createServiceClient(): Promise<TypedSupabaseClient> {
   const cookieStore = await cookies()
 
   return createServerClient(
