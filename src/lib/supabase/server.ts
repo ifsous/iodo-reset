@@ -4,9 +4,8 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import type { Database } from '@/lib/supabase/types'
+import { getSupabaseUrl } from '@/lib/supabase/url'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnySupabaseClient = any
 
 export async function createClient(): Promise<AnySupabaseClient> {
@@ -15,7 +14,7 @@ export async function createClient(): Promise<AnySupabaseClient> {
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -45,7 +44,7 @@ export async function createServiceClient(): Promise<AnySupabaseClient> {
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    getSupabaseUrl(),
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       cookies: {
