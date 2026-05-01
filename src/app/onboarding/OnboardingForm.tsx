@@ -5,13 +5,17 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import type { Database, SymptomType } from '@/lib/supabase/types'
 import { calculatePhase, type PhaseResult } from '@/lib/protocol/calculatePhase'
 
 // ── Tipos internos ────────────────────────────────────────────
+type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
+type Sex = NonNullable<ProfileInsert['sex']>
+
 interface FormData {
   // Etapa 1
   birthYear:  string
-  sex:        string
+  sex:        Sex | ''
   // Etapa 2
   conditions: string[]
   // Etapa 3
@@ -19,7 +23,7 @@ interface FormData {
   priorIodineExp:    boolean | null
   cofactorsInUse:    string[]
   // Etapa 4
-  symptoms: string[]
+  symptoms: SymptomType[]
   // Etapa 5
   mainGoal:          string
   hasProfessional:   boolean | null
@@ -131,8 +135,8 @@ export default function OnboardingForm() {
   function validate(): boolean {
     if (step === 1) {
       const year = parseInt(data.birthYear)
-      if (!data.birthYear || isNaN(year) || year < 1924 || year > 2006) {
-        setError('Informe um ano de nascimento válido (entre 1924 e 2006).')
+      if (!data.birthYear || isNaN(year) || year < 1920 || year > 2010) {
+        setError('Informe um ano de nascimento válido (entre 1920 e 2010).')
         return false
       }
       if (!data.sex) {
@@ -190,15 +194,18 @@ export default function OnboardingForm() {
         medications:            data.medications,
         prior_iodine_exp:       data.priorIodineExp ?? false,
         cofactors_in_use:       data.cofactorsInUse,
-        current_symptoms:       data.symptoms as never[],
+        current_symptoms:       data.symptoms,
         main_goal:              data.mainGoal,
         phase:                  result.phase,
         protocol_start_date:    new Date().toISOString().split('T')[0],
         recommended_dose_drops: result.drops,
-      })
+      }, { onConflict: 'user_id' })
 
     if (profileError) {
-      setError('Erro ao salvar perfil. Tente novamente.')
+      const details = [profileError.message, profileError.details, profileError.hint]
+        .filter(Boolean)
+        .join(' · ')
+      setError(`Erro ao salvar perfil. ${details || 'Tente novamente.'}`)
       setSaving(false)
       return
     }
@@ -257,8 +264,8 @@ export default function OnboardingForm() {
             <input
               type="number"
               inputMode="numeric"
-              min={1924}
-              max={2006}
+              min={1920}
+              max={2010}
               placeholder="Ex: 1988"
               value={data.birthYear}
               onChange={(e) => set('birthYear', e.target.value)}
@@ -403,20 +410,18 @@ export default function OnboardingForm() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Cansaço / baixa energia',    value: 'extra_fatigue'        },
-              { label: 'Queda de cabelo',             value: 'hair_loss'            },
-              { label: 'Ganho de peso',               value: 'weight_gain'          },
-              { label: 'Névoa mental',                value: 'brain_fog'            },
-              { label: 'Intestino lento',             value: 'constipation'         },
-              { label: 'Pele seca',                   value: 'dry_skin'             },
-              { label: 'Sensação de frio',            value: 'cold_intolerance'     },
-              { label: 'Dor nos seios',               value: 'breast_pain'          },
-              { label: 'Ciclo irregular',             value: 'menstrual_worsening'  },
-              { label: 'Ansiedade / irritabilidade',  value: 'anxiety'              },
-              { label: 'Dor de cabeça frequente',     value: 'headache'             },
-              { label: 'Nenhum sintoma relevante',    value: 'none'                 },
-            ].map((o) => (
+            {([
+              { label: 'Cansaço / baixa energia',   value: 'extra_fatigue' },
+              { label: 'Dor de cabeça frequente',   value: 'headache' },
+              { label: 'Dor nos seios',             value: 'breast_pain' },
+              { label: 'Acne / espinhas',           value: 'acne' },
+              { label: 'Rinite / catarro',          value: 'rhinitis' },
+              { label: 'Infecção urinária',         value: 'urinary_infection' },
+              { label: 'Mau hálito',                value: 'bad_breath' },
+              { label: 'Piora menstrual',           value: 'menstrual_worsening' },
+              { label: 'Palpitações',               value: 'palpitations' },
+              { label: 'Nenhum sintoma relevante',  value: 'none' },
+            ] satisfies { label: string; value: SymptomType }[]).map((o) => (
               <CheckChip
                 key={o.value}
                 label={o.label}
