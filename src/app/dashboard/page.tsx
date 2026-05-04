@@ -48,23 +48,30 @@ export default async function DashboardPage() {
     .from('users')
     .select('full_name, onboarding_done')
     .eq('id', user.id)
-    .single<{ full_name: string | null; onboarding_done: boolean }>()
+    .single()
 
-  if (!userData?.onboarding_done) redirect('/onboarding')
+  const typedUserData = userData as {
+    full_name: string | null
+    onboarding_done: boolean
+  } | null
+
+  if (!typedUserData?.onboarding_done) redirect('/onboarding')
 
   // Busca perfil clínico
   const { data: profile } = await supabase
     .from('profiles')
     .select('phase, recommended_dose_drops, protocol_start_date, conditions')
     .eq('user_id', user.id)
-    .single<{
-      phase: ProtocolPhase
-      recommended_dose_drops: number
-      protocol_start_date: string | null
-      conditions: string[]
-    }>()
+    .single()
 
-  if (!profile) redirect('/onboarding')
+  const typedProfile = profile as {
+    phase: ProtocolPhase
+    recommended_dose_drops: number
+    protocol_start_date: string | null
+    conditions: string[]
+  } | null
+
+  if (!typedProfile) redirect('/onboarding')
 
   // Busca último registro diário
   const { data: lastLog } = await supabase
@@ -73,15 +80,17 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .order('log_date', { ascending: false })
     .limit(1)
-    .maybeSingle<{
-      id: string
-      semaphore: SemaphoreColor
-      energy: number | null
-      mood: number | null
-      sleep_quality: number | null
-      dose_drops: number | null
-      log_date: string
-    }>()
+    .maybeSingle()
+
+  const typedLastLog = lastLog as {
+    id: string
+    semaphore: SemaphoreColor
+    energy: number | null
+    mood: number | null
+    sleep_quality: number | null
+    dose_drops: number | null
+    log_date: string
+  } | null
 
   // Busca últimos 7 logs para o gráfico
   const { data: recentLogs } = await supabase
@@ -92,12 +101,12 @@ export default async function DashboardPage() {
     .limit(7)
 
   const dashboardData: DashboardData = {
-    userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
-    phase:             profile.phase,
-    drops:             profile.recommended_dose_drops,
-    protocolStartDate: profile.protocol_start_date,
-    conditions:        profile.conditions ?? [],
-    lastLog:           lastLog ?? null,
+    userName:          typedUserData?.full_name?.split(' ')[0] ?? 'Usuário',
+    phase:             typedProfile.phase,
+    drops:             typedProfile.recommended_dose_drops,
+    protocolStartDate: typedProfile.protocol_start_date,
+    conditions:        typedProfile.conditions ?? [],
+    lastLog:           typedLastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),
   }
 
