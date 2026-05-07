@@ -4,7 +4,6 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 type Mode = 'login' | 'signup' | 'reset'
 
@@ -28,7 +27,6 @@ function translateError(msg: string): string {
 export default function LoginForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const supabase     = createClient()
 
   const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
   const callbackError = searchParams.get('error')
@@ -46,19 +44,36 @@ export default function LoginForm() {
   function reset() { setError(null); setSuccess(null) }
   function switchMode(m: Mode) { reset(); setMode(m) }
 
+  async function submitAuth(payload: {
+    action: Mode
+    email: string
+    password?: string
+    name?: string
+  }): Promise<string | null> {
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const result = await response.json() as { error?: string }
+    return response.ok ? null : result.error ?? 'auth_request_failed'
+  }
+
   // ── Login ──────────────────────────────────────────────────
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
     reset()
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const error = await submitAuth({
+      action: 'login',
       email: email.trim(),
       password,
     })
 
     if (error) {
-      setError(translateError(error.message))
+      setError(translateError(error))
       setLoading(false)
       return
     }
@@ -79,17 +94,15 @@ export default function LoginForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const error = await submitAuth({
+      action: 'signup',
       email: email.trim(),
       password,
-      options: {
-        data:             { full_name: name.trim() },
-        emailRedirectTo:  `${window.location.origin}/auth/callback`,
-      },
+      name,
     })
 
     if (error) {
-      setError(translateError(error.message))
+      setError(translateError(error))
       setLoading(false)
       return
     }
@@ -104,12 +117,13 @@ export default function LoginForm() {
     setLoading(true)
     reset()
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/profile/reset-password`,
+    const error = await submitAuth({
+      action: 'reset',
+      email: email.trim(),
     })
 
     if (error) {
-      setError(translateError(error.message))
+      setError(translateError(error))
     } else {
       setSuccess('E-mail enviado! Verifique sua caixa de entrada.')
     }
