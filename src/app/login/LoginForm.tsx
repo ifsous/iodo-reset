@@ -296,7 +296,7 @@ function Input({ onChange, ...props }: InputProps) {
     <input
       {...props}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
+      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950
                  placeholder-gray-400 focus:outline-none focus:ring-2
                  focus:ring-teal-500 focus:border-transparent transition-all"
     />
