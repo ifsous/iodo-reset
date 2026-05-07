@@ -96,7 +96,6 @@ function NavBar() {
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50">
       <div className="max-w-lg mx-auto flex">
         {items.map((item) => {
-          const active = typeof window !== 'undefined' && window.location.pathname === item.path
           return (
             <button key={item.path} onClick={() => router.push(item.path)}
               className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-colors ${
@@ -181,8 +180,6 @@ function ExamForm({ userId, onSave, onCancel }: {
 
     onSave(data as Exam)
   }
-
-  const opt = EXAM_MAP[examType]
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-4">

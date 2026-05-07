@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import Anthropic                          from '@anthropic-ai/sdk'
 import { createClient }                   from '@/lib/supabase/server'
+import type { Database }                  from '@/lib/supabase/types'
 import { createHash }                     from 'crypto'
 
 const anthropic = new Anthropic({
@@ -15,6 +16,7 @@ const MODEL         = 'claude-sonnet-4-5'
 const MAX_TOKENS    = 600   // 3–4 frases curtas — mais que suficiente
 const FREE_LIMIT    = 3     // análises por dia no plano free
 const CONTEXT_DAYS  = 14   // dias de histórico enviados para a IA
+type GetAiContextArgs = Database['public']['Functions']['get_ai_context']['Args']
 
 // ── System prompt especializado no Protocolo IODO RESET ────────
 const SYSTEM_PROMPT = `Você é o assistente de saúde do app Protocolo IODO RESET. Seu papel é analisar os dados diários do usuário e fornecer orientação educacional personalizada, prática e humana.
@@ -145,12 +147,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Busca contexto completo via função SQL do banco
+    const contextArgs: GetAiContextArgs = {
+      p_user_id:   user.id,
+      p_log_id:    log_id,
+      p_days_back: CONTEXT_DAYS,
+    }
+
     const { data: contextData, error: contextError } = await supabase
-      .rpc('get_ai_context', {
-        p_user_id:   user.id,
-        p_log_id:    log_id,
-        p_days_back: CONTEXT_DAYS,
-      })
+      .rpc('get_ai_context', contextArgs)
 
     if (contextError || !contextData) {
       console.error('get_ai_context error:', contextError)

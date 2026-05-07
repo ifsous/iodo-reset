@@ -87,7 +87,7 @@ function SymptomChip({ label, checked, onClick, danger = false }: { label: strin
   )
 }
 
-export default function DiaryForm({ userId, userName, recommendedDrops, existing, today }: Props) {
+export default function DiaryForm({ userId, recommendedDrops, existing, today }: Props) {
   const router   = useRouter()
   const supabase = createClient()
 

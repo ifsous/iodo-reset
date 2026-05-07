@@ -4,7 +4,7 @@
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ExamsView        from './ExamsView'
-import type { ExamType, SemaphoreColor } from '@/lib/supabase/types'
+import type { ExamType } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Exames — IODO RESET',

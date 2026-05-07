@@ -15,15 +15,23 @@ export type PlanType = 'free' | 'pro' | 'clinic'
 export type ProtocolPhase = '0' | '1' | '2' | '3' | '4'
 export type SemaphoreColor = 'green' | 'yellow' | 'red'
 export type AlertLevel = 'ok' | 'attention' | 'urgent'
+export type SexType = 'female' | 'male' | 'other'
 export type SymptomType =
   | 'headache'
   | 'acne'
   | 'extra_fatigue'
+  | 'hair_loss'
+  | 'weight_gain'
+  | 'brain_fog'
+  | 'constipation'
+  | 'dry_skin'
+  | 'cold_intolerance'
   | 'breast_pain'
   | 'rhinitis'
   | 'urinary_infection'
   | 'bad_breath'
   | 'menstrual_worsening'
+  | 'anxiety'
   | 'palpitations'
   | 'none'
   | 'other'
@@ -82,13 +90,14 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+        Relationships: []
       }
       profiles: {
         Row: {
           id: string
           user_id: string
           birth_year: number | null
-          sex: 'female' | 'male' | 'other' | null
+          sex: SexType | null
           weight_kg: number | null
           conditions: string[]
           medications: string[]
@@ -107,7 +116,7 @@ export interface Database {
           id?: string
           user_id: string
           birth_year?: number | null
-          sex?: 'female' | 'male' | 'other' | null
+          sex?: SexType | null
           weight_kg?: number | null
           conditions?: string[]
           medications?: string[]
@@ -121,6 +130,7 @@ export interface Database {
           pro_notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Relationships: []
       }
       daily_logs: {
         Row: {
@@ -168,6 +178,7 @@ export interface Database {
           is_edited?: boolean
         }
         Update: Partial<Database['public']['Tables']['daily_logs']['Insert']>
+        Relationships: []
       }
       ai_analyses: {
         Row: {
@@ -202,6 +213,7 @@ export interface Database {
           from_cache?: boolean
         }
         Update: Partial<Database['public']['Tables']['ai_analyses']['Insert']>
+        Relationships: []
       }
       exams: {
         Row: {
@@ -234,6 +246,7 @@ export interface Database {
           result_unit?: string | null
           reference_min?: number | null
           reference_max?: number | null
+          is_within_range?: boolean | null
           exam_date: string
           lab_name?: string | null
           file_url?: string | null
@@ -242,6 +255,7 @@ export interface Database {
           pro_notes?: string | null
         }
         Update: Partial<Database['public']['Tables']['exams']['Insert']>
+        Relationships: []
       }
       professionals: {
         Row: {
@@ -273,6 +287,7 @@ export interface Database {
           is_verified?: boolean
         }
         Update: Partial<Database['public']['Tables']['professionals']['Insert']>
+        Relationships: []
       }
       pro_patients: {
         Row: {
@@ -300,6 +315,7 @@ export interface Database {
           invite_accepted_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['pro_patients']['Insert']>
+        Relationships: []
       }
     }
     Views: {
@@ -322,6 +338,7 @@ export interface Database {
           last_mood: number | null
           last_dose_drops: number | null
         }
+        Relationships: []
       }
       v_user_weekly: {
         Row: {
@@ -336,6 +353,7 @@ export interface Database {
           yellow_days: number
           red_days: number
         }
+        Relationships: []
       }
     }
     Functions: {

@@ -6,12 +6,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { calculatePhase, type PhaseResult } from '@/lib/protocol/calculatePhase'
+import type { SexType, SymptomType } from '@/lib/supabase/types'
 
 // ── Tipos internos ────────────────────────────────────────────
 interface FormData {
   // Etapa 1
   birthYear:  string
-  sex:        string
+  sex:        SexType | ''
   // Etapa 2
   conditions: string[]
   // Etapa 3
@@ -19,7 +20,7 @@ interface FormData {
   priorIodineExp:    boolean | null
   cofactorsInUse:    string[]
   // Etapa 4
-  symptoms: string[]
+  symptoms: SymptomType[]
   // Etapa 5
   mainGoal:          string
   hasProfessional:   boolean | null
@@ -40,14 +41,14 @@ const INITIAL: FormData = {
 const TOTAL_STEPS = 5
 
 // ── Helpers ───────────────────────────────────────────────────
-function toggle(arr: string[], val: string): string[] {
+function toggle<T>(arr: T[], val: T): T[] {
   return arr.includes(val) ? arr.filter((v) => v !== val) : [...arr, val]
 }
 
 // ── Sub-componentes de UI ─────────────────────────────────────
-function CheckChip({
+function CheckChip<T extends string>({
   label, value, checked, onChange,
-}: { label: string; value: string; checked: boolean; onChange: (v: string) => void }) {
+}: { label: string; value: T; checked: boolean; onChange: (v: T) => void }) {
   return (
     <button
       type="button"
@@ -63,9 +64,9 @@ function CheckChip({
   )
 }
 
-function RadioChip({
+function RadioChip<T extends string>({
   label, value, selected, onChange,
-}: { label: string; value: string; selected: string; onChange: (v: string) => void }) {
+}: { label: string; value: T; selected: T | ''; onChange: (v: T) => void }) {
   return (
     <button
       type="button"
@@ -177,7 +178,10 @@ export default function OnboardingForm() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Sessão expirada. Faça login novamente.'); setSaving(false); return }
 
+    if (!data.sex) { setError('Selecione seu sexo biológico.'); setSaving(false); return }
+
     const year = parseInt(data.birthYear)
+    const sex = data.sex
 
     // Salva o perfil
     const { error: profileError } = await supabase
@@ -185,12 +189,12 @@ export default function OnboardingForm() {
       .upsert({
         user_id:                user.id,
         birth_year:             year,
-        sex:                    data.sex,
+        sex,
         conditions:             data.conditions,
         medications:            data.medications,
         prior_iodine_exp:       data.priorIodineExp ?? false,
         cofactors_in_use:       data.cofactorsInUse,
-        current_symptoms:       data.symptoms as never[],
+        current_symptoms:       data.symptoms,
         main_goal:              data.mainGoal,
         phase:                  result.phase,
         protocol_start_date:    new Date().toISOString().split('T')[0],
@@ -270,11 +274,11 @@ export default function OnboardingForm() {
           <div>
             <SectionLabel>Sexo biológico</SectionLabel>
             <div className="flex gap-3 flex-wrap">
-              {[
+              {([
                 { label: 'Feminino',           value: 'female' },
                 { label: 'Masculino',          value: 'male'   },
                 { label: 'Prefiro não informar', value: 'other' },
-              ].map((o) => (
+              ] as const).map((o) => (
                 <RadioChip key={o.value} {...o} selected={data.sex} onChange={(v) => set('sex', v)} />
               ))}
             </div>
@@ -295,7 +299,7 @@ export default function OnboardingForm() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {[
+            {([
               { label: 'Hipotireoidismo',     value: 'hipotireoidismo'  },
               { label: 'Hashimoto',           value: 'hashimoto'        },
               { label: 'Hipertireoidismo',    value: 'hipertireoidismo' },
@@ -305,7 +309,7 @@ export default function OnboardingForm() {
               { label: 'Miomas',              value: 'miomas'           },
               { label: 'Próstata aumentada',  value: 'prostata'         },
               { label: 'Saudável — nenhuma',  value: 'saudavel'         },
-            ].map((o) => (
+            ] as const).map((o) => (
               <CheckChip
                 key={o.value}
                 label={o.label}
@@ -403,7 +407,7 @@ export default function OnboardingForm() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {[
+            {([
               { label: 'Cansaço / baixa energia',    value: 'extra_fatigue'        },
               { label: 'Queda de cabelo',             value: 'hair_loss'            },
               { label: 'Ganho de peso',               value: 'weight_gain'          },
@@ -416,7 +420,7 @@ export default function OnboardingForm() {
               { label: 'Ansiedade / irritabilidade',  value: 'anxiety'              },
               { label: 'Dor de cabeça frequente',     value: 'headache'             },
               { label: 'Nenhum sintoma relevante',    value: 'none'                 },
-            ].map((o) => (
+            ] as const).map((o) => (
               <CheckChip
                 key={o.value}
                 label={o.label}
