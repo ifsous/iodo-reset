@@ -4,7 +4,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { calculatePhase, type PhaseResult } from '@/lib/protocol/calculatePhase'
 import type { SexType, SymptomType } from '@/lib/supabase/types'
 
@@ -113,7 +112,6 @@ function ErrorMsg({ msg }: { msg: string | null }) {
 // ── Componente principal ──────────────────────────────────────
 export default function OnboardingForm() {
   const router  = useRouter()
-  const supabase = createClient()
 
   const [step,    setStep]    = useState(1)
   const [data,    setData]    = useState<FormData>(INITIAL)
@@ -175,21 +173,16 @@ export default function OnboardingForm() {
     setSaving(true)
     setError(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setError('Sessão expirada. Faça login novamente.'); setSaving(false); return }
-
-    if (!data.sex) { setError('Selecione seu sexo biológico.'); setSaving(false); return }
+    if (!data.sex) { setError('Selecione seu sexo biologico.'); setSaving(false); return }
 
     const year = parseInt(data.birthYear)
-    const sex = data.sex
 
-    // Salva o perfil
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        user_id:                user.id,
+    const response = await fetch('/api/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         birth_year:             year,
-        sex,
+        sex:                    data.sex,
         conditions:             data.conditions,
         medications:            data.medications,
         prior_iodine_exp:       data.priorIodineExp ?? false,
@@ -199,22 +192,12 @@ export default function OnboardingForm() {
         phase:                  result.phase,
         protocol_start_date:    new Date().toISOString().split('T')[0],
         recommended_dose_drops: result.drops,
-      })
+      }),
+    })
 
-    if (profileError) {
-      setError('Erro ao salvar perfil. Tente novamente.')
-      setSaving(false)
-      return
-    }
-
-    // Marca onboarding como concluído
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ onboarding_done: true })
-      .eq('id', user.id)
-
-    if (userError) {
-      setError('Erro ao finalizar cadastro. Tente novamente.')
+    const saveResult = await response.json() as { error?: string }
+    if (!response.ok) {
+      setError(saveResult.error ?? 'Erro ao salvar perfil. Tente novamente.')
       setSaving(false)
       return
     }
@@ -222,7 +205,6 @@ export default function OnboardingForm() {
     router.push('/dashboard')
     router.refresh()
   }
-
   const pct = Math.round((step / TOTAL_STEPS) * 100)
 
   return (
