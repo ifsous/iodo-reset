@@ -11,11 +11,35 @@ interface OnboardingPayload {
   medications?: string[]
   prior_iodine_exp?: boolean
   cofactors_in_use?: string[]
-  current_symptoms?: SymptomType[]
+  current_symptoms?: string[]
   main_goal?: string
   phase?: ProtocolPhase
   protocol_start_date?: string
   recommended_dose_drops?: number
+}
+
+const VALID_SYMPTOMS = new Set<SymptomType>([
+  'headache',
+  'acne',
+  'extra_fatigue',
+  'breast_pain',
+  'rhinitis',
+  'urinary_infection',
+  'bad_breath',
+  'menstrual_worsening',
+  'palpitations',
+  'none',
+  'other',
+])
+
+function normalizeSymptoms(symptoms: string[] | undefined): SymptomType[] {
+  const normalized = (symptoms ?? []).map((symptom) =>
+    VALID_SYMPTOMS.has(symptom as SymptomType)
+      ? symptom as SymptomType
+      : 'other'
+  )
+
+  return Array.from(new Set(normalized))
 }
 
 function jsonError(message: string, status = 400) {
@@ -48,7 +72,7 @@ export async function POST(request: Request) {
     medications: payload.medications ?? [],
     prior_iodine_exp: payload.prior_iodine_exp ?? false,
     cofactors_in_use: payload.cofactors_in_use ?? [],
-    current_symptoms: payload.current_symptoms ?? [],
+    current_symptoms: normalizeSymptoms(payload.current_symptoms),
     main_goal: payload.main_goal ?? null,
     phase: payload.phase,
     protocol_start_date: payload.protocol_start_date ?? new Date().toISOString().split('T')[0],
