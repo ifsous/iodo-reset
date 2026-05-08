@@ -15,6 +15,8 @@ export type PlanType = 'free' | 'pro' | 'clinic'
 export type ProtocolPhase = '0' | '1' | '2' | '3' | '4'
 export type SemaphoreColor = 'green' | 'yellow' | 'red'
 export type AlertLevel = 'ok' | 'attention' | 'urgent'
+export type ProtocolRiskLevel = 'standard' | 'caution' | 'professional_only'
+export type ProgressionStrategy = 'cofactors_first' | 'slow' | 'standard' | 'supervised'
 export type SexType = 'female' | 'male' | 'other'
 export type SymptomType =
   | 'headache'
@@ -105,6 +107,13 @@ export interface Database {
           main_goal: string | null
           prior_iodine_exp: boolean
           cofactors_in_use: string[]
+          safety_flags: string[]
+          halogen_exposure: string[]
+          has_professional_followup: boolean
+          protocol_risk_level: ProtocolRiskLevel
+          progression_strategy: ProgressionStrategy
+          protocol_alerts: string[]
+          exam_schedule: Json
           phase: ProtocolPhase
           protocol_start_date: string | null
           recommended_dose_drops: number
@@ -124,6 +133,13 @@ export interface Database {
           main_goal?: string | null
           prior_iodine_exp?: boolean
           cofactors_in_use?: string[]
+          safety_flags?: string[]
+          halogen_exposure?: string[]
+          has_professional_followup?: boolean
+          protocol_risk_level?: ProtocolRiskLevel
+          progression_strategy?: ProgressionStrategy
+          protocol_alerts?: string[]
+          exam_schedule?: Json
           phase?: ProtocolPhase
           protocol_start_date?: string | null
           recommended_dose_drops?: number

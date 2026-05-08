@@ -11,11 +11,11 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F7FAF9] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8">
         <div className="flex justify-center mb-4">
-          <div className="w-12 h-12 bg-teal-700 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-teal-800 rounded-lg flex items-center justify-center shadow-sm">
             <span className="text-white font-bold text-lg select-none">IR</span>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import type { Database, ProtocolPhase, SexType, SymptomType } from '@/lib/supabase/types'
+import type { Database, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SexType, SymptomType } from '@/lib/supabase/types'
+import { calculateProtocol, examScheduleToJson } from '@/lib/protocol/protocolRules'
 
 type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
 
@@ -11,6 +12,12 @@ interface OnboardingPayload {
   medications?: string[]
   prior_iodine_exp?: boolean
   cofactors_in_use?: string[]
+  safety_flags?: string[]
+  halogen_exposure?: string[]
+  has_professional_followup?: boolean
+  protocol_risk_level?: ProtocolRiskLevel
+  progression_strategy?: ProgressionStrategy
+  protocol_alerts?: string[]
   current_symptoms?: string[]
   main_goal?: string
   phase?: ProtocolPhase
@@ -22,6 +29,12 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'headache',
   'acne',
   'extra_fatigue',
+  'hair_loss',
+  'weight_gain',
+  'brain_fog',
+  'constipation',
+  'dry_skin',
+  'cold_intolerance',
   'breast_pain',
   'rhinitis',
   'urinary_infection',
@@ -57,14 +70,34 @@ export async function POST(request: Request) {
 
   if (
     !payload.birth_year ||
-    !payload.sex ||
-    !payload.phase ||
-    payload.recommended_dose_drops === undefined
+    !payload.sex
   ) {
     return jsonError('Dados do perfil incompletos.')
   }
 
   const profile: ProfileInsert = {
+    ...(() => {
+      const protocol = calculateProtocol({
+        birthYear: payload.birth_year,
+        conditions: payload.conditions ?? [],
+        symptoms: payload.current_symptoms ?? [],
+        medications: payload.medications ?? [],
+        cofactorsInUse: payload.cofactors_in_use ?? [],
+        priorIodineExp: payload.prior_iodine_exp ?? false,
+        hasProfessional: payload.has_professional_followup ?? false,
+        halogenExposure: payload.halogen_exposure ?? [],
+        safetyFlags: payload.safety_flags ?? [],
+      })
+
+      return {
+        phase: protocol.phase,
+        recommended_dose_drops: protocol.drops,
+        protocol_risk_level: protocol.riskLevel,
+        progression_strategy: protocol.progressionStrategy,
+        protocol_alerts: protocol.alerts,
+        exam_schedule: examScheduleToJson(protocol.examSchedule),
+      }
+    })(),
     user_id: user.id,
     birth_year: payload.birth_year,
     sex: payload.sex,
@@ -72,11 +105,12 @@ export async function POST(request: Request) {
     medications: payload.medications ?? [],
     prior_iodine_exp: payload.prior_iodine_exp ?? false,
     cofactors_in_use: payload.cofactors_in_use ?? [],
+    safety_flags: payload.safety_flags ?? [],
+    halogen_exposure: payload.halogen_exposure ?? [],
+    has_professional_followup: payload.has_professional_followup ?? false,
     current_symptoms: normalizeSymptoms(payload.current_symptoms),
     main_goal: payload.main_goal ?? null,
-    phase: payload.phase,
     protocol_start_date: payload.protocol_start_date ?? new Date().toISOString().split('T')[0],
-    recommended_dose_drops: payload.recommended_dose_drops,
   }
 
   const { data: existingProfile, error: lookupError } = await supabase

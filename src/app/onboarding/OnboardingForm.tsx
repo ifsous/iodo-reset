@@ -18,9 +18,11 @@ interface FormData {
   medications:       string[]
   priorIodineExp:    boolean | null
   cofactorsInUse:    string[]
+  halogenExposure:   string[]
   // Etapa 4
   symptoms: SymptomType[]
   // Etapa 5
+  safetyFlags:       string[]
   mainGoal:          string
   hasProfessional:   boolean | null
 }
@@ -32,12 +34,14 @@ const INITIAL: FormData = {
   medications:      [],
   priorIodineExp:   null,
   cofactorsInUse:   [],
+  halogenExposure:  [],
   symptoms:         [],
+  safetyFlags:      [],
   mainGoal:         '',
   hasProfessional:  null,
 }
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 
 // ── Helpers ───────────────────────────────────────────────────
 function toggle<T>(arr: T[], val: T): T[] {
@@ -54,7 +58,7 @@ function CheckChip<T extends string>({
       onClick={() => onChange(value)}
       className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all text-left ${
         checked
-          ? 'bg-teal-700 border-teal-700 text-white'
+          ? 'bg-teal-800 border-teal-800 text-white'
           : 'bg-white border-gray-200 text-gray-700 hover:border-teal-400'
       }`}
     >
@@ -72,7 +76,7 @@ function RadioChip<T extends string>({
       onClick={() => onChange(value)}
       className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
         selected === value
-          ? 'bg-teal-700 border-teal-700 text-white'
+          ? 'bg-teal-800 border-teal-800 text-white'
           : 'bg-white border-gray-200 text-gray-700 hover:border-teal-400'
       }`}
     >
@@ -91,7 +95,7 @@ function BoolChip({
       onClick={() => onChange(value)}
       className={`px-6 py-2.5 rounded-lg border text-sm font-medium transition-all ${
         isSelected
-          ? 'bg-teal-700 border-teal-700 text-white'
+          ? 'bg-teal-800 border-teal-800 text-white'
           : 'bg-white border-gray-200 text-gray-700 hover:border-teal-400'
       }`}
     >
@@ -151,7 +155,11 @@ export default function OnboardingForm() {
       setError('Selecione pelo menos um sintoma (ou "Nenhum").')
       return false
     }
-    if (step === 5) {
+    if (step === 5 && data.hasProfessional === null) {
+      setError('Responda se tem acompanhamento profissional.')
+      return false
+    }
+    if (step === 6) {
       if (!data.mainGoal) { setError('Selecione seu objetivo principal.'); return false }
       if (data.hasProfessional === null) { setError('Responda se tem acompanhamento profissional.'); return false }
     }
@@ -161,9 +169,19 @@ export default function OnboardingForm() {
   function handleNext() {
     if (!validate()) return
     // Na etapa 4→5, calcula o resultado antes de exibir a confirmação
-    if (step === 4) {
+    if (step === 5) {
       const year = parseInt(data.birthYear)
-      setResult(calculatePhase({ birthYear: year, conditions: data.conditions }))
+      setResult(calculatePhase({
+        birthYear: year,
+        conditions: data.conditions,
+        symptoms: data.symptoms,
+        medications: data.medications,
+        cofactorsInUse: data.cofactorsInUse,
+        priorIodineExp: data.priorIodineExp ?? false,
+        hasProfessional: data.hasProfessional ?? false,
+        halogenExposure: data.halogenExposure,
+        safetyFlags: data.safetyFlags,
+      }))
     }
     next()
   }
@@ -187,6 +205,9 @@ export default function OnboardingForm() {
         medications:            data.medications,
         prior_iodine_exp:       data.priorIodineExp ?? false,
         cofactors_in_use:       data.cofactorsInUse,
+        halogen_exposure:       data.halogenExposure,
+        safety_flags:           data.safetyFlags,
+        has_professional_followup: data.hasProfessional ?? false,
         current_symptoms:       data.symptoms,
         main_goal:              data.mainGoal,
         phase:                  result.phase,
@@ -248,8 +269,8 @@ export default function OnboardingForm() {
               placeholder="Ex: 1988"
               value={data.birthYear}
               onChange={(e) => set('birthYear', e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm
-                         focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent"
             />
           </div>
 
@@ -285,6 +306,8 @@ export default function OnboardingForm() {
               { label: 'Hipotireoidismo',     value: 'hipotireoidismo'  },
               { label: 'Hashimoto',           value: 'hashimoto'        },
               { label: 'Hipertireoidismo',    value: 'hipertireoidismo' },
+              
+              { label: 'Doenca de Graves',     value: 'graves'           },
               { label: 'Cistos mamários',     value: 'cistos_mamarios'  },
               { label: 'SOP',                 value: 'sop'              },
               { label: 'Endometriose',        value: 'endometriose'     },
@@ -400,7 +423,8 @@ export default function OnboardingForm() {
               { label: 'Dor nos seios',               value: 'breast_pain'          },
               { label: 'Ciclo irregular',             value: 'menstrual_worsening'  },
               { label: 'Ansiedade / irritabilidade',  value: 'anxiety'              },
-              { label: 'Dor de cabeça frequente',     value: 'headache'             },
+              { label: 'Dor de cabeca',               value: 'headache'             },
+              { label: 'Palpitacoes',                  value: 'palpitations'        },
               { label: 'Nenhum sintoma relevante',    value: 'none'                 },
             ] as const).map((o) => (
               <CheckChip
@@ -423,8 +447,85 @@ export default function OnboardingForm() {
         </div>
       )}
 
-      {/* ── ETAPA 5: Objetivo + Resultado ── */}
+      {/* Etapa 5: seguranca e exposicao */}
       {step === 5 && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Seguranca do protocolo</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Essas respostas ajudam a definir se o melhor caminho e iniciar, preparar cofatores ou seguir somente com profissional.
+            </p>
+          </div>
+
+          <div>
+            <SectionLabel>Sinais que pedem cautela</SectionLabel>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Gravidez', value: 'pregnancy' },
+                { label: 'Amamentacao', value: 'breastfeeding' },
+                { label: 'Hipertensao', value: 'hypertension' },
+                { label: 'Doenca renal', value: 'kidney_disease' },
+                { label: 'Historico de palpitacoes', value: 'palpitations_history' },
+                { label: 'Nenhum destes', value: 'none' },
+              ].map((o) => (
+                <CheckChip
+                  key={o.value}
+                  label={o.label}
+                  value={o.value}
+                  checked={data.safetyFlags.includes(o.value)}
+                  onChange={(v) => {
+                    if (v === 'none') {
+                      set('safetyFlags', data.safetyFlags.includes('none') ? [] : ['none'])
+                    } else {
+                      set('safetyFlags', toggle(data.safetyFlags.filter((s) => s !== 'none'), v))
+                    }
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <SectionLabel>Exposicao a halogenios</SectionLabel>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Agua com fluor', value: 'fluoride_water' },
+                { label: 'Muito pao/massas', value: 'bromide_bakery' },
+                { label: 'Piscina/cloro frequente', value: 'chlorine_pool' },
+                { label: 'Pasta dental com fluor', value: 'fluoride_toothpaste' },
+                { label: 'Baixo consumo de sal', value: 'low_salt' },
+                { label: 'Nao sei', value: 'unknown' },
+              ].map((o) => (
+                <CheckChip
+                  key={o.value}
+                  label={o.label}
+                  value={o.value}
+                  checked={data.halogenExposure.includes(o.value)}
+                  onChange={(v) => set('halogenExposure', toggle(data.halogenExposure, v))}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <SectionLabel>Tem acompanhamento de profissional de saude?</SectionLabel>
+            <div className="flex gap-3">
+              <BoolChip label="Sim" value={true} selected={data.hasProfessional} onChange={(v) => set('hasProfessional', v)} />
+              <BoolChip label="Nao" value={false} selected={data.hasProfessional} onChange={(v) => set('hasProfessional', v)} />
+            </div>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+            <p className="text-xs text-amber-800 leading-relaxed">
+              Graves, hipertireoidismo ativo, gravidez, amamentacao, doenca renal, hipertensao ou palpitacoes exigem cuidado extra e acompanhamento profissional.
+            </p>
+          </div>
+
+          <ErrorMsg msg={error} />
+        </div>
+      )}
+      {/* ── Etapa 6: Objetivo + Resultado ── */}
+      {step === 6 && (
         <div className="space-y-6">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Objetivo e confirmação</h2>
@@ -454,19 +555,11 @@ export default function OnboardingForm() {
             </div>
           </div>
 
-          <div>
-            <SectionLabel>Tem acompanhamento de profissional de saúde?</SectionLabel>
-            <div className="flex gap-3">
-              <BoolChip label="Sim" value={true}  selected={data.hasProfessional} onChange={(v) => set('hasProfessional', v)} />
-              <BoolChip label="Não" value={false} selected={data.hasProfessional} onChange={(v) => set('hasProfessional', v)} />
-            </div>
-          </div>
-
           {/* Resultado calculado */}
           {result && (
-            <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 space-y-3">
+            <div className="bg-white border border-teal-100 rounded-lg shadow-sm p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 bg-teal-800 rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M8 2v12M2 8h12" stroke="white" strokeWidth="2" strokeLinecap="round"/>
                   </svg>
@@ -492,6 +585,34 @@ export default function OnboardingForm() {
                 </div>
               </div>
 
+              <div className={`rounded-lg border p-3 ${
+                result.riskLevel === 'professional_only'
+                  ? 'bg-red-50 border-red-100'
+                  : result.riskLevel === 'caution'
+                    ? 'bg-amber-50 border-amber-100'
+                    : 'bg-emerald-50 border-emerald-100'
+              }`}>
+                <p className="text-xs font-semibold text-gray-900">
+                  {result.riskLevel === 'professional_only'
+                    ? 'Acompanhamento profissional necessario'
+                    : result.riskLevel === 'caution'
+                      ? 'Protocolo conservador'
+                      : 'Protocolo padrao'}
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  Estrategia: {result.progressionStrategy.replace(/_/g, ' ')}
+                </p>
+                {result.alerts.length > 0 && (
+                  <ul className="space-y-1 mt-2">
+                    {result.alerts.map((alert) => (
+                      <li key={alert} className="text-xs text-gray-700 flex gap-1">
+                        <span>-</span><span>{alert}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               <p className="text-xs text-teal-800 leading-relaxed">{result.description}</p>
 
               <div>
@@ -499,7 +620,7 @@ export default function OnboardingForm() {
                 <ul className="space-y-0.5">
                   {result.cofactors.slice(0, 4).map((c) => (
                     <li key={c} className="text-xs text-teal-700 flex gap-1">
-                      <span>›</span><span>{c}</span>
+                      <span>-</span><span>{c}</span>
                     </li>
                   ))}
                 </ul>
@@ -533,7 +654,7 @@ export default function OnboardingForm() {
           <button
             type="button"
             onClick={handleNext}
-            className="flex-1 py-2.5 bg-teal-700 hover:bg-teal-800 text-white
+            className="flex-1 py-2.5 bg-teal-800 hover:bg-teal-900 text-white
                        rounded-lg text-sm font-medium transition-all"
           >
             Continuar
@@ -543,7 +664,7 @@ export default function OnboardingForm() {
             type="button"
             onClick={handleSave}
             disabled={saving || !result}
-            className="flex-1 py-2.5 bg-teal-700 hover:bg-teal-800 text-white
+            className="flex-1 py-2.5 bg-teal-800 hover:bg-teal-900 text-white
                        rounded-lg text-sm font-medium transition-all
                        disabled:opacity-50 disabled:cursor-not-allowed"
           >

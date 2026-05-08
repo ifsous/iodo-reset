@@ -15,6 +15,7 @@ const PROTECTED_ROUTES = [
   '/diary',
   '/onboarding',
   '/exams',
+  '/protocol',
   '/profile',
   '/pro',           // painel profissional
 ]

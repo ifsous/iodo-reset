@@ -8,20 +8,29 @@ import { createClient }                   from '@/lib/supabase/server'
 import type { Database }                  from '@/lib/supabase/types'
 import { createHash }                     from 'crypto'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
-
 const MODEL         = 'claude-sonnet-4-5'
 const MAX_TOKENS    = 600   // 3–4 frases curtas — mais que suficiente
-const FREE_LIMIT    = 3     // análises por dia no plano free
+const FREE_LIMIT    = 6     // total de analises IA no plano free
 const CONTEXT_DAYS  = 14   // dias de histórico enviados para a IA
 type GetAiContextArgs = Database['public']['Functions']['get_ai_context']['Args']
+
+let anthropicClient: Anthropic | null = null
+
+function getAnthropicClient() {
+  anthropicClient ??= new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+  })
+  return anthropicClient
+}
 
 // ── System prompt especializado no Protocolo IODO RESET ────────
 const SYSTEM_PROMPT = `Você é o assistente de saúde do app Protocolo IODO RESET. Seu papel é analisar os dados diários do usuário e fornecer orientação educacional personalizada, prática e humana.
 
 REGRAS ABSOLUTAS:
+- Regras de seguranca do motor de protocolo sempre prevalecem sobre sugestoes de dose
+- Se risco do protocolo for professional_only: nao sugira iniciar, subir ou retomar dose; recomende acompanhamento profissional
+- Se estrategia for cofactors_first: priorize cofatores, hidratacao, sal conforme tolerancia e exames antes de falar em progressao
+- Se estrategia for slow: mantenha linguagem conservadora e nao incentive aumento automatico de dose
 - Nunca faça diagnóstico médico, prescrição ou indicação terapêutica
 - Sempre deixe claro que suas orientações são educacionais
 - Se semáforo vermelho ou palpitações: orienta a pausar e procurar profissional
@@ -70,6 +79,9 @@ PERFIL:
 - Fase atual: ${profile?.phase ?? 'desconhecida'}
 - Condições: ${Array.isArray(profile?.conditions) ? (profile.conditions as string[]).join(', ') || 'nenhuma' : 'não informado'}
 - Dose recomendada: ${profile?.recommended_dose_drops ?? '?'} gotas/dia
+- Risco do protocolo: ${profile?.protocol_risk_level ?? 'standard'}
+- Estrategia: ${profile?.progression_strategy ?? 'standard'}
+- Alertas do protocolo: ${Array.isArray(profile?.protocol_alerts) ? (profile.protocol_alerts as string[]).join('; ') || 'nenhum' : 'nenhum'}
 - Início do protocolo: ${profile?.protocol_start_date ?? 'não informado'}
 
 REGISTRO DE HOJE:
@@ -97,8 +109,38 @@ Com base nesses dados, forneça sua orientação educacional personalizada segui
 }
 
 // ── Gera hash dos dados para cache ────────────────────────────
+type StableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | StableValue[]
+  | { [key: string]: StableValue }
+
+function stableSort(value: unknown): StableValue {
+  if (value === null) return null
+
+  if (Array.isArray(value)) {
+    return value.map(stableSort)
+  }
+
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, nested]) => [key, stableSort(nested)])
+    )
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value
+  }
+
+  return String(value)
+}
+
 function hashContext(context: Record<string, unknown>): string {
-  const str = JSON.stringify(context, Object.keys(context).sort())
+  const str = JSON.stringify(stableSort(context))
   return createHash('sha256').update(str).digest('hex').slice(0, 32)
 }
 
@@ -131,16 +173,21 @@ export async function POST(request: NextRequest) {
     const isPro = (userData as { plan: string } | null)?.plan === 'pro' || (userData as { plan: string } | null)?.plan === 'clinic'
 
     if (!isPro) {
-      const today = new Date().toISOString().split('T')[0]
-      const { count } = await supabase
-        .from('ai_analyses')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', `${today}T00:00:00`)
+      const [{ count: diaryAnalyses }, { count: examAnalyses }] = await Promise.all([
+        supabase
+          .from('ai_analyses')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('exams')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .not('ai_interpreted_at', 'is', null),
+      ])
 
-      if ((count ?? 0) >= FREE_LIMIT) {
+      if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= FREE_LIMIT) {
         return NextResponse.json({
-          error: `Limite de ${FREE_LIMIT} análises por dia atingido no plano gratuito.`,
+          error: `Limite gratuito de ${FREE_LIMIT} analises com IA atingido. Contrate o plano Pro para continuar.`,
           upgrade: true,
         }, { status: 429 })
       }
@@ -163,6 +210,19 @@ export async function POST(request: NextRequest) {
 
     const context = contextData as Record<string, unknown>
 
+    const { data: protocolProfile } = await supabase
+      .from('profiles')
+      .select('protocol_risk_level, progression_strategy, protocol_alerts, safety_flags, halogen_exposure, has_professional_followup')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (protocolProfile) {
+      context.profile = {
+        ...((context.profile as Record<string, unknown> | null) ?? {}),
+        ...protocolProfile,
+      }
+    }
+
     // 5. Verifica cache
     const inputHash = hashContext(context)
 
@@ -184,7 +244,7 @@ export async function POST(request: NextRequest) {
     // 6. Chama Claude API
     const userPrompt = buildUserPrompt(context)
 
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model:      MODEL,
       max_tokens: MAX_TOKENS,
       system:     SYSTEM_PROMPT,

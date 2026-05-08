@@ -30,8 +30,11 @@ export default function LoginForm() {
 
   const redirectTo = searchParams.get('redirectTo') ?? '/dashboard'
   const callbackError = searchParams.get('error')
+  const requestedMode = searchParams.get('mode')
+  const initialMode: Mode =
+    requestedMode === 'reset' || requestedMode === 'signup' ? requestedMode : 'login'
 
-  const [mode,     setMode]     = useState<Mode>('login')
+  const [mode,     setMode]     = useState<Mode>(initialMode)
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [name,     setName]     = useState('')
@@ -137,7 +140,7 @@ export default function LoginForm() {
 
   // ── UI ─────────────────────────────────────────────────────
   return (
-    <div className="bg-white py-8 px-6 shadow-sm rounded-2xl border border-gray-100 sm:px-10">
+    <div className="bg-white py-8 px-6 shadow-sm rounded-lg border border-gray-200/70 sm:px-10">
 
       {/* Tabs login / cadastro */}
       {mode !== 'reset' && (
@@ -236,11 +239,11 @@ export default function LoginForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800
+          className="w-full py-2.5 px-4 bg-teal-800 hover:bg-teal-900
                      disabled:opacity-50 disabled:cursor-not-allowed
                      text-white text-sm font-medium rounded-lg
                      transition-all focus:outline-none focus:ring-2
-                     focus:ring-teal-500 focus:ring-offset-2"
+                     focus:ring-teal-600 focus:ring-offset-2"
         >
           {loading
             ? <Spinner label={mode === 'login' ? 'Entrando…' : mode === 'signup' ? 'Criando conta…' : 'Enviando…'} />
@@ -312,7 +315,7 @@ function Input({ onChange, ...props }: InputProps) {
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950
                  placeholder-gray-400 focus:outline-none focus:ring-2
-                 focus:ring-teal-500 focus:border-transparent transition-all"
+                 focus:ring-teal-600 focus:border-transparent transition-all"
     />
   )
 }

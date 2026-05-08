@@ -5,7 +5,7 @@
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DashboardView    from './DashboardView'
-import type { ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
+import type { Json, PlanType, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Dashboard — Protocolo IODO RESET',
@@ -17,6 +17,12 @@ export interface DashboardData {
   drops:              number
   protocolStartDate:  string | null
   conditions:         string[]
+  protocolRiskLevel:  ProtocolRiskLevel
+  progressionStrategy: ProgressionStrategy
+  protocolAlerts:     string[]
+  examSchedule:       Json
+  isPro:              boolean
+  analysesUsed:       number
   lastLog: {
     id:           string
     semaphore:    SemaphoreColor
@@ -46,22 +52,26 @@ export default async function DashboardPage() {
   // Busca dados do usuário
   const { data: userData } = await supabase
     .from('users')
-    .select('full_name, onboarding_done')
+    .select('full_name, onboarding_done, plan')
     .eq('id', user.id)
-    .single<{ full_name: string | null; onboarding_done: boolean }>()
+    .single<{ full_name: string | null; onboarding_done: boolean; plan: PlanType }>()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
   // Busca perfil clínico
   const { data: profile } = await supabase
     .from('profiles')
-    .select('phase, recommended_dose_drops, protocol_start_date, conditions')
+    .select('phase, recommended_dose_drops, protocol_start_date, conditions, protocol_risk_level, progression_strategy, protocol_alerts, exam_schedule')
     .eq('user_id', user.id)
     .single<{
       phase: ProtocolPhase
       recommended_dose_drops: number
       protocol_start_date: string | null
       conditions: string[]
+      protocol_risk_level: ProtocolRiskLevel
+      progression_strategy: ProgressionStrategy
+      protocol_alerts: string[]
+      exam_schedule: Json
     }>()
 
   if (!profile) redirect('/onboarding')
@@ -91,12 +101,31 @@ export default async function DashboardPage() {
     .order('log_date', { ascending: false })
     .limit(7)
 
+  const isPro = userData.plan === 'pro' || userData.plan === 'clinic'
+  const [{ count: diaryAnalysesUsed }, { count: examAnalysesUsed }] = await Promise.all([
+    supabase
+      .from('ai_analyses')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    supabase
+      .from('exams')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('ai_interpreted_at', 'is', null),
+  ])
+
   const dashboardData: DashboardData = {
     userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
     phase:             profile.phase,
     drops:             profile.recommended_dose_drops,
     protocolStartDate: profile.protocol_start_date,
     conditions:        profile.conditions ?? [],
+    protocolRiskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    protocolAlerts:    profile.protocol_alerts ?? [],
+    examSchedule:      profile.exam_schedule ?? [],
+    isPro,
+    analysesUsed:      (diaryAnalysesUsed ?? 0) + (examAnalysesUsed ?? 0),
     lastLog:           lastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),
   }

@@ -79,7 +79,7 @@ function SymptomChip({ label, checked, onClick, danger = false }: { label: strin
     <button type="button" onClick={onClick}
       className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all text-left ${
         checked
-          ? danger ? 'bg-red-600 border-red-600 text-white' : 'bg-teal-700 border-teal-700 text-white'
+          ? danger ? 'bg-red-600 border-red-600 text-white' : 'bg-teal-800 border-teal-800 text-white'
           : 'bg-white border-gray-200 text-gray-700 hover:border-teal-300'
       }`}>
       {label}
@@ -169,17 +169,17 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      <div className="bg-teal-700 pt-12 pb-5 px-4">
+    <div className="min-h-screen bg-[#F7FAF9] pb-8">
+      <div className="bg-teal-800 pt-12 pb-5 px-4">
         <div className="max-w-lg mx-auto flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')} className="text-teal-200 hover:text-white transition-colors p-1">
+          <button onClick={() => router.push('/dashboard')} className="text-teal-100/80 hover:text-white transition-colors p-1">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <path d="M13 4L7 10L13 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
           <div>
             <h1 className="text-white text-lg font-semibold">{existing ? 'Editar registro' : 'Registro de hoje'}</h1>
-            <p className="text-teal-200 text-xs">
+            <p className="text-teal-100/80 text-xs">
               {new Date(today + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
             </p>
           </div>
@@ -189,7 +189,7 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
       <div className="max-w-lg mx-auto px-4 space-y-4 pt-4">
 
         {/* Semáforo em tempo real */}
-        <div className={`${sem.bg} border ${sem.border} rounded-xl p-4 flex items-center gap-3`}>
+        <div className={`${sem.bg} border ${sem.border} rounded-lg p-4 flex items-center gap-3 shadow-sm`}>
           <div className={`w-4 h-4 rounded-full ${sem.dot} flex-shrink-0`} />
           <div>
             <p className={`text-sm font-semibold ${sem.text}`}>{sem.label}</p>
@@ -198,7 +198,7 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
         </div>
 
         {/* Dose */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-1">
             <p className="text-sm font-medium text-gray-700">Dose tomada hoje</p>
             <span className="text-xs text-gray-400">Recomendada: {recommendedDrops} gotas</span>
@@ -218,15 +218,15 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
         </div>
 
         {/* Sliders */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-5">
+        <div className="bg-white rounded-lg border border-gray-200/70 p-4 space-y-5 shadow-sm">
           <p className="text-sm font-medium text-gray-700">Como você está hoje?</p>
           <SliderField label="Energia" value={energy} onChange={setEnergy} color={energy >= 7 ? 'text-teal-600' : energy >= 4 ? 'text-amber-500' : 'text-red-500'} />
-          <SliderField label="Humor"   value={mood}   onChange={setMood}   color={mood   >= 7 ? 'text-purple-600' : mood   >= 4 ? 'text-amber-500' : 'text-red-500'} />
-          <SliderField label="Sono"    value={sleep}  onChange={setSleep}  color={sleep  >= 7 ? 'text-blue-600'   : sleep  >= 4 ? 'text-amber-500' : 'text-red-500'} />
+          <SliderField label="Humor"   value={mood}   onChange={setMood}   color={mood   >= 7 ? 'text-indigo-600' : mood   >= 4 ? 'text-amber-500' : 'text-red-500'} />
+          <SliderField label="Sono"    value={sleep}  onChange={setSleep}  color={sleep  >= 7 ? 'text-sky-600'    : sleep  >= 4 ? 'text-amber-500' : 'text-red-500'} />
         </div>
 
         {/* Sintomas */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <p className="text-sm font-medium text-gray-700 mb-3">Sintomas de hoje</p>
           <div className="grid grid-cols-2 gap-2">
             {SYMPTOMS.map((s) => (
@@ -244,7 +244,7 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
         </div>
 
         {/* Checklist */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-medium text-gray-700">Cofatores de hoje</p>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -276,13 +276,13 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
         </div>
 
         {/* Observações */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Observações <span className="text-gray-400 font-normal">(opcional)</span>
           </label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
             placeholder="Como foi seu dia? Alguma reação ou mudança que queira registrar..."
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none" />
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-600 focus:border-transparent resize-none" />
         </div>
 
         {error && (
@@ -292,7 +292,7 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
         )}
 
         <button type="button" onClick={handleSave} disabled={saving}
-          className="w-full py-4 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-base rounded-xl transition-all active:scale-[0.98] shadow-sm">
+          className="w-full py-4 bg-teal-800 hover:bg-teal-900 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-base rounded-lg transition-all active:scale-[0.98] shadow-sm">
           {saving ? (
             <span className="flex items-center justify-center gap-2">
               <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">

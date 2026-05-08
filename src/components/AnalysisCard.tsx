@@ -14,10 +14,10 @@ interface Props {
   logId:    string | null   // null = sem registro hoje ainda
   hasLog:   boolean         // true = existe registro do dia
   isPro:    boolean         // true = plano pro ou clinic
-  analyses: number          // quantidade de análises feitas hoje (plano free)
+  analyses: number          // total de analises IA usadas no plano free
 }
 
-const FREE_LIMIT = 3
+const FREE_LIMIT = 6
 
 // ── Ícone IA ──────────────────────────────────────────────────
 function AIIcon({ className = '' }: { className?: string }) {
@@ -104,7 +104,7 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
   // ── Sem registro hoje ──────────────────────────────────────
   if (!hasLog) {
     return (
-      <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <AIIcon className="text-teal-600" />
           <p className="text-sm font-medium text-gray-700">Análise do dia</p>
@@ -126,7 +126,7 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -190,7 +190,7 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
           {upgrade && (
             <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
               <p className="text-xs text-amber-800 leading-relaxed">
-                Faça upgrade para o plano Pro e tenha análises ilimitadas, histórico completo e acesso ao painel do profissional.
+                Contrate o plano Pro para liberar analises ilimitadas, historico completo e acesso ao painel do profissional.
               </p>
               <button className="mt-2 text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors">
                 Ver plano Pro →
@@ -209,12 +209,12 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
             flex items-center justify-center gap-2 mt-1
             ${limitReached || !logId
               ? 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-100'
-              : 'bg-teal-700 hover:bg-teal-800 text-white active:scale-[0.98]'
+              : 'bg-teal-800 hover:bg-teal-900 text-white active:scale-[0.98]'
             }`}
         >
           <AIIcon />
           {limitReached
-            ? `Limite diário atingido (${FREE_LIMIT}/dia)`
+            ? 'Contrate o plano Pro para continuar'
             : 'Analisar meu dia com IA'
           }
         </button>
