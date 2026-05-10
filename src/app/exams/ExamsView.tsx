@@ -353,7 +353,7 @@ function ExamCard({
 
   async function handleAnalyze() {
     if (isFreeLimitReached) {
-      setAiError('Contrate o plano Pro para continuar usando analises com IA.')
+      setAiError('Seu limite gratuito acabou. Solicite liberacao do plano Pro para continuar.')
       return
     }
 

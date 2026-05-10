@@ -8,6 +8,7 @@ type ExamRow = Database['public']['Tables']['exams']['Row']
 const MODEL = 'claude-sonnet-4-5'
 const MAX_TOKENS = 400
 const FREE_LIMIT = 6
+const PRO_MONTHLY_LIMIT = 100
 
 let anthropicClient: Anthropic | null = null
 
@@ -62,9 +63,10 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single<{ plan: PlanType }>()
 
-  const isPro = userData?.plan === 'pro' || userData?.plan === 'clinic'
+  const isPro = userData?.plan === 'pro'
+  const isClinic = userData?.plan === 'clinic'
 
-  if (!isPro) {
+  if (!isPro && !isClinic) {
     const [{ count: diaryAnalyses }, { count: examAnalyses }] = await Promise.all([
       supabase
         .from('ai_analyses')
@@ -82,6 +84,33 @@ export async function POST(request: NextRequest) {
         `Limite gratuito de ${FREE_LIMIT} analises com IA atingido. Contrate o plano Pro para continuar.`,
         429,
         { upgrade: true }
+      )
+    }
+  }
+
+  if (isPro) {
+    const monthStart = new Date()
+    monthStart.setUTCDate(1)
+    monthStart.setUTCHours(0, 0, 0, 0)
+
+    const [{ count: diaryAnalyses }, { count: examAnalyses }] = await Promise.all([
+      supabase
+        .from('ai_analyses')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', monthStart.toISOString()),
+      supabase
+        .from('exams')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .not('ai_interpreted_at', 'is', null)
+        .gte('ai_interpreted_at', monthStart.toISOString()),
+    ])
+
+    if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= PRO_MONTHLY_LIMIT) {
+      return jsonError(
+        `Limite mensal de ${PRO_MONTHLY_LIMIT} analises com IA atingido no plano Pro.`,
+        429
       )
     }
   }

@@ -190,11 +190,8 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
           {upgrade && (
             <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
               <p className="text-xs text-amber-800 leading-relaxed">
-                Contrate o plano Pro para liberar analises ilimitadas, historico completo e acesso ao painel do profissional.
+                Solicite liberacao do plano Pro para ampliar o limite de IA e acessar recursos avancados.
               </p>
-              <button className="mt-2 text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors">
-                Ver plano Pro →
-              </button>
             </div>
           )}
         </div>
