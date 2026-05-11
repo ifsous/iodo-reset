@@ -255,6 +255,23 @@ export default async function ProtocolPage() {
           )}
         </Section>
 
+        <Section title="Orientacao alimentar">
+          <BulletList
+            items={[
+              'Priorize comida de verdade: proteinas, vegetais, frutas, gorduras boas e fontes minerais, evitando base alimentar ultraprocessada.',
+              'Use sal integral ou nao refinado conforme tolerancia e orientacao individual; sal iodado refinado sozinho nao e tratado como base suficiente no protocolo.',
+              'Inclua fontes alimentares de iodo quando fizer sentido, como peixes, frutos do mar e algas com prudencia, porque o teor de iodo pode variar muito.',
+              'Reduza exposicao alimentar a halogenios: excesso de ultraprocessados, panificados industrializados, agua muito fluoretada e fontes recorrentes de cloro/bromo.',
+              'Se a alimentacao for vegana, vegetariana ou muito restritiva, acompanhe exames e cofatores com mais cuidado, pois a ingestao de iodo e minerais pode ficar baixa.',
+            ]}
+          />
+          <div className="mt-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+            <p className="text-xs text-teal-800 leading-relaxed">
+              A meta alimentar no IODO RESET e sustentar tolerancia: hidratacao, sal conforme tolerancia, cofatores e menor carga de competidores do iodo.
+            </p>
+          </div>
+        </Section>
+
         <Section title="Sinais que pedem cautela">
           <BulletList
             items={[
