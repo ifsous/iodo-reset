@@ -468,7 +468,7 @@ export default function ProfileView({ data }: { data: ProfileData }) {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => router.push('/profile/reset-password')}
+              onClick={() => router.push('/profile/reset-password?mode=change')}
               className="w-full py-3 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all"
             >
               Alterar senha

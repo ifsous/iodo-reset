@@ -9,11 +9,14 @@ export const metadata = {
   title: 'Redefinir senha - IODO RESET',
 }
 
-export default async function ResetPasswordPage() {
+type SearchParams = Promise<{ mode?: string }>
+
+export default async function ResetPasswordPage({ searchParams }: { searchParams: SearchParams }) {
   const supabase = await createClient()
+  const params = await searchParams
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?mode=reset')
 
-  return <ResetPasswordView email={user.email ?? ''} />
+  return <ResetPasswordView email={user.email ?? ''} requireCurrentPassword={params.mode === 'change'} />
 }

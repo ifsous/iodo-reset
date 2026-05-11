@@ -4,10 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function ResetPasswordView({ email }: { email: string }) {
+export default function ResetPasswordView({
+  email,
+  requireCurrentPassword,
+}: {
+  email: string
+  requireCurrentPassword: boolean
+}) {
   const router = useRouter()
   const supabase = createClient()
 
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,6 +24,11 @@ export default function ResetPasswordView({ email }: { email: string }) {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+
+    if (requireCurrentPassword && currentPassword.length === 0) {
+      setError('Informe sua senha atual.')
+      return
+    }
 
     if (password.length < 8) {
       setError('A senha deve ter pelo menos 8 caracteres.')
@@ -29,6 +41,20 @@ export default function ResetPasswordView({ email }: { email: string }) {
     }
 
     setLoading(true)
+
+    if (requireCurrentPassword) {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      })
+
+      if (signInError) {
+        setLoading(false)
+        setError('Senha atual incorreta.')
+        return
+      }
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password })
     setLoading(false)
 
@@ -49,10 +75,12 @@ export default function ResetPasswordView({ email }: { email: string }) {
           </div>
         </div>
         <h1 className="text-center text-2xl font-semibold text-gray-900">
-          Redefinir senha
+          {requireCurrentPassword ? 'Alterar senha' : 'Redefinir senha'}
         </h1>
         <p className="mt-2 text-center text-sm text-gray-500">
-          {email || 'Digite uma nova senha para sua conta'}
+          {requireCurrentPassword
+            ? 'Confirme sua senha atual e defina uma nova senha.'
+            : email || 'Digite uma nova senha para sua conta'}
         </p>
       </div>
 
@@ -76,6 +104,19 @@ export default function ResetPasswordView({ email }: { email: string }) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {requireCurrentPassword && (
+                <Field label="Senha atual" htmlFor="current-password">
+                  <Input
+                    id="current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="Digite sua senha atual"
+                    value={currentPassword}
+                    onChange={setCurrentPassword}
+                  />
+                </Field>
+              )}
+
               <Field label="Nova senha" htmlFor="password">
                 <Input
                   id="password"
