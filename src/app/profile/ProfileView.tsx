@@ -160,7 +160,7 @@ function prettyFallback(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function NavBar() {
+function NavBar({ showClinicAccess }: { showClinicAccess: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -187,6 +187,14 @@ function NavBar() {
         <path d="M8 7h4M8 10h4M8 13h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
       </svg>
     )},
+    ...(showClinicAccess ? [{
+      label: 'Clinica', path: '/pro', icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M4 17V5.5A2.5 2.5 0 016.5 3h7A2.5 2.5 0 0116 5.5V17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M2.5 17h15M10 6.5v5M7.5 9h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      ),
+    }] : []),
     { label: 'Perfil', path: '/profile', icon: (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <circle cx="10" cy="7" r="3.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -326,6 +334,7 @@ export default function ProfileView({ data }: { data: ProfileData }) {
   const protocolDays = daysInProtocol(data.profile.protocolStartDate)
   const doseMg = (data.profile.recommendedDoseDrops * 6.25).toFixed(1)
   const examSchedule = parseExamSchedule(data.profile.examSchedule)
+  const hasClinicAccess = data.user.isProfessional || data.user.plan === 'clinic'
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] pb-24">
@@ -416,6 +425,22 @@ export default function ProfileView({ data }: { data: ProfileData }) {
           <InfoRow label="Sexo biologico" value={data.profile.sex ? SEX_LABELS[data.profile.sex] : 'Nao informado'} />
         </Card>
 
+        <Card title="Conta e acesso">
+          <InfoRow label="Tipo de conta" value={PLAN_LABELS[plan]} />
+          <InfoRow label="Acesso profissional" value={hasClinicAccess ? 'Ativo' : 'Inativo'} />
+          {hasClinicAccess && (
+            <div className="pt-3">
+              <button
+                type="button"
+                onClick={() => router.push('/pro')}
+                className="w-full py-3 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-medium transition-all"
+              >
+                Acessar painel clinico
+              </button>
+            </div>
+          )}
+        </Card>
+
         <Card title="Perfil clinico">
           <div className="space-y-4">
             <div>
@@ -488,7 +513,7 @@ export default function ProfileView({ data }: { data: ProfileData }) {
         </p>
       </main>
 
-      <NavBar />
+      <NavBar showClinicAccess={hasClinicAccess} />
     </div>
   )
 }

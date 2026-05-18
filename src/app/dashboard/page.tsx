@@ -26,6 +26,7 @@ export interface DashboardData {
   protocolAlerts:     string[]
   examSchedule:       Json
   plan:               PlanType
+  isProfessional:     boolean
   analysesUsed:       number
   analysesLimit:      number | null
   analysesWindow:     AiLimitWindow
@@ -80,9 +81,9 @@ export default async function DashboardPage() {
   // Busca dados do usuário
   const { data: userData } = await supabase
     .from('users')
-    .select('full_name, onboarding_done, plan')
+    .select('full_name, onboarding_done, plan, is_professional')
     .eq('id', user.id)
-    .single<{ full_name: string | null; onboarding_done: boolean; plan: PlanType }>()
+    .single<{ full_name: string | null; onboarding_done: boolean; plan: PlanType; is_professional: boolean }>()
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
@@ -229,6 +230,7 @@ export default async function DashboardPage() {
     protocolAlerts:    profile.protocol_alerts ?? [],
     examSchedule:      profile.exam_schedule ?? [],
     plan:              userData.plan,
+    isProfessional:    userData.is_professional,
     analysesUsed:      (diaryAnalysesUsed ?? 0) + (examAnalysesUsed ?? 0),
     analysesLimit:     analysisPolicy.limit,
     analysesWindow:    analysisPolicy.window,

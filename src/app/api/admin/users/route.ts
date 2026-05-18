@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/adminAuth'
@@ -147,6 +148,12 @@ export async function PATCH(request: NextRequest) {
   if (data.plan === 'clinic' || data.is_professional) {
     await ensureProfessionalProfile(supabase, data)
   }
+
+  revalidatePath('/admin')
+  revalidatePath('/dashboard')
+  revalidatePath('/profile')
+  revalidatePath('/pro')
+  revalidatePath('/exams')
 
   return NextResponse.json({ user: data })
 }
