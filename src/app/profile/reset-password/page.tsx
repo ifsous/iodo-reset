@@ -18,5 +18,5 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?mode=reset')
 
-  return <ResetPasswordView email={user.email ?? ''} requireCurrentPassword={params.mode === 'change'} />
+  return <ResetPasswordView email={user.email ?? ''} requireCurrentPassword={params.mode !== 'recovery'} />
 }

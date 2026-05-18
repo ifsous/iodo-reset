@@ -3,6 +3,8 @@
 // Card de análise IA — botão, loading, resultado e cache indicator
 
 import { useState } from 'react'
+import type { AiLimitWindow } from '@/lib/ai-limits'
+import type { PlanType } from '@/lib/supabase/types'
 
 interface AnalysisResult {
   analysis:     string
@@ -11,13 +13,13 @@ interface AnalysisResult {
 }
 
 interface Props {
-  logId:    string | null   // null = sem registro hoje ainda
-  hasLog:   boolean         // true = existe registro do dia
-  isPro:    boolean         // true = plano pro ou clinic
-  analyses: number          // total de analises IA usadas no plano free
+  logId:    string | null
+  hasLog:   boolean
+  plan:     PlanType
+  analyses: number
+  limit:    number | null
+  window:   AiLimitWindow
 }
-
-const FREE_LIMIT = 6
 
 // ── Ícone IA ──────────────────────────────────────────────────
 function AIIcon({ className = '' }: { className?: string }) {
@@ -53,14 +55,23 @@ function formatDate(iso: string): string {
 }
 
 // ── Componente principal ──────────────────────────────────────
-export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) {
+export default function AnalysisCard({ logId, hasLog, plan, analyses, limit, window }: Props) {
   const [loading,  setLoading]  = useState(false)
   const [result,   setResult]   = useState<AnalysisResult | null>(null)
   const [error,    setError]    = useState<string | null>(null)
   const [upgrade,  setUpgrade]  = useState(false)
+  const [localAnalyses, setLocalAnalyses] = useState(analyses)
 
-  const remainingFree = Math.max(0, FREE_LIMIT - analyses)
-  const limitReached  = !isPro && remainingFree === 0
+  const hasLimit = limit !== null
+  const remaining = hasLimit ? Math.max(0, limit - localAnalyses) : null
+  const limitReached = hasLimit && remaining === 0
+  const isFree = plan === 'free'
+
+  const usageLabel = !hasLimit
+    ? 'IA ilimitada'
+    : window === 'monthly'
+      ? `${localAnalyses} de ${limit} no mes`
+      : `${remaining} de ${limit} restantes`
 
   async function handleAnalyze() {
     if (!logId || loading) return
@@ -94,6 +105,9 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
         from_cache:   data.from_cache ?? false,
         generated_at: data.generated_at!,
       })
+      if (!data.from_cache && hasLimit) {
+        setLocalAnalyses((current) => current + 1)
+      }
     } catch {
       setError('Erro de conexão. Tente novamente.')
     } finally {
@@ -134,9 +148,9 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
           <AIIcon className="text-teal-600" />
           <p className="text-sm font-medium text-gray-700">Análise do dia</p>
         </div>
-        {!isPro && !result && (
+        {!result && (
           <span className="text-xs text-gray-400">
-            {remainingFree} de {FREE_LIMIT} restantes
+            {usageLabel}
           </span>
         )}
         {result?.from_cache && (
@@ -190,7 +204,10 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
           {upgrade && (
             <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
               <p className="text-xs text-amber-800 leading-relaxed">
-                Solicite liberacao do plano Pro para ampliar o limite de IA e acessar recursos avancados.
+                {isFree
+                  ? 'Solicite liberacao do plano Pro para ampliar o limite de IA e acessar recursos avancados.'
+                  : 'Seu limite mensal sera renovado no inicio do proximo mes.'
+                }
               </p>
             </div>
           )}
@@ -211,7 +228,7 @@ export default function AnalysisCard({ logId, hasLog, isPro, analyses }: Props) 
         >
           <AIIcon />
           {limitReached
-            ? 'Contrate o plano Pro para continuar'
+            ? isFree ? 'Contrate o plano Pro para continuar' : 'Limite mensal atingido'
             : 'Analisar meu dia com IA'
           }
         </button>

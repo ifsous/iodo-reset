@@ -208,7 +208,7 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
                               label={PLAN_LABELS[plan]}
                               active={user.plan === plan}
                               disabled={saving}
-                              onClick={() => void updateUser(user.id, { plan })}
+                              onClick={() => void updateUser(user.id, plan === 'clinic' ? { plan, is_professional: true } : { plan })}
                             />
                           ))}
                         </div>

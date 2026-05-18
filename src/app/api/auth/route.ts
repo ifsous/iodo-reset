@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-type AuthAction = 'login' | 'signup' | 'reset'
+type AuthAction = 'login' | 'signup' | 'reset' | 'resend_signup'
 
 interface AuthPayload {
   action?: AuthAction
@@ -61,8 +61,25 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'reset') {
+    const next = encodeURIComponent('/profile/reset-password?mode=recovery')
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getOrigin(request)}/auth/callback?next=/profile/reset-password`,
+      redirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
+    })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'resend_signup') {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${getOrigin(request)}/auth/callback`,
+      },
     })
 
     if (error) {

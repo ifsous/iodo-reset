@@ -1,6 +1,9 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
+import type { ProgressHistoryTone } from '@/lib/protocol/progress-history'
+import type { ProgressionCriterionStatus } from '@/lib/protocol/progression-readiness'
+import type { TodayPlanStatus } from '@/lib/protocol/today-plan'
 import type { Json, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor } from '@/lib/supabase/types'
 import AnalysisCard from '@/components/AnalysisCard'
 
@@ -101,6 +104,290 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
   )
 }
 
+const TODAY_PLAN_TONES: Record<TodayPlanStatus, { border: string; badge: string; accent: string; iconBg: string }> = {
+  ok: {
+    border: 'border-emerald-100',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+    accent: 'text-emerald-700',
+    iconBg: 'bg-emerald-500',
+  },
+  caution: {
+    border: 'border-amber-100',
+    badge: 'bg-amber-50 text-amber-800 border-amber-100',
+    accent: 'text-amber-700',
+    iconBg: 'bg-amber-400',
+  },
+  pause: {
+    border: 'border-red-100',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    accent: 'text-red-700',
+    iconBg: 'bg-red-500',
+  },
+  prepare: {
+    border: 'border-sky-100',
+    badge: 'bg-sky-50 text-sky-800 border-sky-100',
+    accent: 'text-sky-700',
+    iconBg: 'bg-sky-500',
+  },
+  professional: {
+    border: 'border-red-100',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    accent: 'text-red-700',
+    iconBg: 'bg-red-500',
+  },
+}
+
+function TodayPlanCard({
+  data,
+  hasLogToday,
+  onRegister,
+}: {
+  data: DashboardData['todayPlan']
+  hasLogToday: boolean
+  onRegister: () => void
+}) {
+  const tone = TODAY_PLAN_TONES[data.status]
+
+  return (
+    <div className={`bg-white rounded-lg border ${tone.border} p-4 shadow-sm space-y-4`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${tone.iconBg} flex-shrink-0`} />
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Plano de hoje</p>
+            <h2 className="text-lg font-semibold text-gray-900 leading-tight">{data.title}</h2>
+          </div>
+        </div>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${tone.badge}`}>
+          {data.badge}
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        <p className={`text-sm font-medium leading-relaxed ${tone.accent}`}>{data.primaryAction}</p>
+        <p className="text-xs text-gray-600 leading-relaxed">{data.reason}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {data.checklist.map((item) => (
+          <div
+            key={item.label}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+              item.priority === 'high' ? 'border-teal-100 bg-teal-50/50' : 'border-gray-100 bg-slate-50'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${
+              item.done === true
+                ? 'bg-teal-700 border-teal-700'
+                : item.done === false
+                  ? 'bg-white border-gray-300'
+                  : 'bg-gray-100 border-gray-200'
+            }`}>
+              {item.done === true && (
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 5.5L4 8L8.5 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <span className="text-xs font-medium text-gray-700 truncate">{item.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t border-gray-100 pt-3 flex flex-col gap-3">
+        <p className="text-xs text-gray-500 leading-relaxed">
+          <span className="font-medium text-gray-700">Observar amanhã:</span> {data.tomorrowFocus}
+        </p>
+        <button
+          type="button"
+          onClick={onRegister}
+          className="w-full bg-teal-800 hover:bg-teal-900 active:scale-[0.98] text-white font-medium py-3 rounded-lg text-sm transition-all flex items-center justify-center gap-2 shadow-sm"
+        >
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8" stroke="white" strokeWidth="1.5"/>
+            <path d="M10 6v8M6 10h8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          {hasLogToday ? 'Editar registro de hoje' : 'Registrar hoje'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const CRITERION_STYLES: Record<ProgressionCriterionStatus, { dot: string; label: string }> = {
+  met: {
+    dot: 'bg-emerald-500',
+    label: 'ok',
+  },
+  partial: {
+    dot: 'bg-amber-400',
+    label: 'ajustar',
+  },
+  blocked: {
+    dot: 'bg-red-500',
+    label: 'pendente',
+  },
+}
+
+function ProgressionReadinessCard({
+  data,
+  onOpenProtocol,
+}: {
+  data: DashboardData['progressionReadiness']
+  onOpenProtocol: () => void
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Para avancar</p>
+          <h2 className="text-base font-semibold text-gray-900 leading-tight">{data.title}</h2>
+          <p className="text-xs text-gray-600 leading-relaxed mt-1">{data.summary}</p>
+        </div>
+        <div className="w-16 h-16 rounded-full bg-slate-50 border border-slate-100 flex flex-col items-center justify-center flex-shrink-0">
+          <span className="text-lg font-semibold text-teal-800">{data.readinessPercent}%</span>
+          <span className="text-[10px] text-gray-400">pronto</span>
+        </div>
+      </div>
+
+      <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full bg-teal-700 rounded-full" style={{ width: `${data.readinessPercent}%` }} />
+      </div>
+
+      <div className="space-y-2">
+        {data.criteria.map((item) => {
+          const style = CRITERION_STYLES[item.status]
+          return (
+            <div key={item.label} className="flex items-start gap-3 rounded-lg bg-slate-50 border border-gray-100 px-3 py-2">
+              <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${style.dot}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-gray-800 truncate">{item.label}</p>
+                  <span className="text-[10px] uppercase tracking-wide text-gray-400 flex-shrink-0">{style.label}</span>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{item.detail}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="border-t border-gray-100 pt-3 flex flex-col gap-3">
+        <p className="text-xs text-gray-500 leading-relaxed">
+          <span className="font-medium text-gray-700">Proximo foco:</span> {data.nextStep}
+        </p>
+        <button
+          type="button"
+          onClick={onOpenProtocol}
+          className="w-full rounded-lg border border-teal-200 text-teal-800 text-sm font-medium py-3 hover:bg-teal-50 transition-colors"
+        >
+          Ver guia do protocolo
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const HISTORY_TONES: Record<ProgressHistoryTone, { dot: string; text: string; bg: string; border: string }> = {
+  good: {
+    dot: 'bg-emerald-500',
+    text: 'text-emerald-700',
+    bg: 'bg-emerald-50',
+    border: 'border-emerald-100',
+  },
+  watch: {
+    dot: 'bg-amber-400',
+    text: 'text-amber-700',
+    bg: 'bg-amber-50',
+    border: 'border-amber-100',
+  },
+  alert: {
+    dot: 'bg-red-500',
+    text: 'text-red-700',
+    bg: 'bg-red-50',
+    border: 'border-red-100',
+  },
+  neutral: {
+    dot: 'bg-slate-400',
+    text: 'text-gray-700',
+    bg: 'bg-slate-50',
+    border: 'border-gray-100',
+  },
+}
+
+function ProgressHistoryCard({ data }: { data: DashboardData['progressHistory'] }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Historico de progresso</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">{data.title}</h2>
+        <p className="text-xs text-gray-600 leading-relaxed mt-1">{data.summary}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {data.metrics.map((metric) => {
+          const tone = HISTORY_TONES[metric.tone]
+          return (
+            <div key={metric.label} className={`rounded-lg border ${tone.border} ${tone.bg} p-3`}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-500">{metric.label}</p>
+                <span className={`w-2 h-2 rounded-full ${tone.dot} flex-shrink-0`} />
+              </div>
+              <p className={`text-xl font-semibold mt-1 ${tone.text}`}>{metric.value}</p>
+              <p className="text-[11px] text-gray-500 leading-snug mt-1">{metric.detail}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="space-y-2">
+        {data.events.map((event) => {
+          const tone = HISTORY_TONES[event.tone]
+          return (
+            <div key={event.label} className="flex items-start gap-3 rounded-lg bg-slate-50 border border-gray-100 px-3 py-2">
+              <span className={`w-2.5 h-2.5 rounded-full mt-1.5 ${tone.dot} flex-shrink-0`} />
+              <div>
+                <p className="text-xs font-medium text-gray-800">{event.label}</p>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{event.detail}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData['professionalAdjustment']> }) {
+  const professionalName = data.professionalName ?? 'Seu profissional'
+
+  return (
+    <div className="bg-white rounded-lg border border-teal-100 p-4 shadow-sm space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Ajuste do profissional</p>
+          <h2 className="text-base font-semibold text-gray-900 leading-tight">{professionalName}</h2>
+        </div>
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-teal-50 text-teal-800 border-teal-100 whitespace-nowrap">
+          Ativo
+        </span>
+      </div>
+      <div className="rounded-lg bg-teal-50 border border-teal-100 p-3">
+        <p className="text-xs text-teal-700 mb-1">Dose sugerida</p>
+        <p className="text-xl font-semibold text-teal-900">
+          {data.customDoseSuggestion} gota{data.customDoseSuggestion === 1 ? '' : 's'}
+        </p>
+      </div>
+      {data.proNotes && (
+        <p className="text-sm text-gray-700 leading-relaxed">{data.proNotes}</p>
+      )}
+      <p className="text-xs text-gray-500 leading-relaxed">
+        Este ajuste orienta o Plano de Hoje, exceto quando houver alerta de seguranca como semaforo vermelho ou palpitacoes.
+      </p>
+    </div>
+  )
+}
+
 function MiniBar({ value, color }: { value: number | null; color: string }) {
   const pct = value ? Math.round((value / 10) * 100) : 0
   return (
@@ -196,6 +483,23 @@ export default function DashboardView({ data }: { data: DashboardData }) {
 
       <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
 
+        <TodayPlanCard
+          data={data.todayPlan}
+          hasLogToday={hasLogToday}
+          onRegister={() => router.push('/diary')}
+        />
+
+        {data.professionalAdjustment && (
+          <ProfessionalAdjustmentCard data={data.professionalAdjustment} />
+        )}
+
+        <ProgressionReadinessCard
+          data={data.progressionReadiness}
+          onOpenProtocol={() => router.push('/protocol')}
+        />
+
+        <ProgressHistoryCard data={data.progressHistory} />
+
         {/* Semáforo */}
         <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <div className="flex items-center justify-between mb-3">
@@ -245,16 +549,6 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           </button>
         </div>
 
-        {/* Botão registrar */}
-        <button onClick={() => router.push('/diary')}
-          className="w-full bg-teal-800 hover:bg-teal-900 active:scale-[0.98] text-white font-medium py-4 rounded-lg text-base transition-all flex items-center justify-center gap-2 shadow-sm">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="10" cy="10" r="8" stroke="white" strokeWidth="1.5"/>
-            <path d="M10 6v8M6 10h8" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          {hasLogToday ? 'Editar registro de hoje' : 'Registrar hoje'}
-        </button>
-
         {/* Métricas */}
         <div className="grid grid-cols-2 gap-3">
           <MetricCard label="Dose atual" value={data.drops === 0 ? '—' : data.drops}
@@ -294,8 +588,10 @@ export default function DashboardView({ data }: { data: DashboardData }) {
         <AnalysisCard
           logId={data.lastLog?.id ?? null}
           hasLog={hasLogToday}
-          isPro={data.isPro}
+          plan={data.plan}
           analyses={data.analysesUsed}
+          limit={data.analysesLimit}
+          window={data.analysesWindow}
         />
 
         {/* Evolução 7 dias */}

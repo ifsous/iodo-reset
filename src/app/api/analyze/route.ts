@@ -6,12 +6,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 import Anthropic                          from '@anthropic-ai/sdk'
 import { createClient }                   from '@/lib/supabase/server'
 import type { Database }                  from '@/lib/supabase/types'
+import { AI_FREE_LIMIT, AI_PRO_MONTHLY_LIMIT, getCurrentMonthStart } from '@/lib/ai-limits'
 import { createHash }                     from 'crypto'
 
 const MODEL         = 'claude-sonnet-4-5'
 const MAX_TOKENS    = 600   // 3–4 frases curtas — mais que suficiente
-const FREE_LIMIT    = 6     // total de analises IA no plano free
-const PRO_MONTHLY_LIMIT = 100
 const CONTEXT_DAYS  = 14   // dias de histórico enviados para a IA
 type GetAiContextArgs = Database['public']['Functions']['get_ai_context']['Args']
 
@@ -188,36 +187,34 @@ export async function POST(request: NextRequest) {
           .not('ai_interpreted_at', 'is', null),
       ])
 
-      if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= FREE_LIMIT) {
+      if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= AI_FREE_LIMIT) {
         return NextResponse.json({
-          error: `Limite gratuito de ${FREE_LIMIT} analises com IA atingido. Contrate o plano Pro para continuar.`,
+          error: `Limite gratuito de ${AI_FREE_LIMIT} analises com IA atingido. Contrate o plano Pro para continuar.`,
           upgrade: true,
         }, { status: 429 })
       }
     }
 
     if (isPro) {
-      const monthStart = new Date()
-      monthStart.setUTCDate(1)
-      monthStart.setUTCHours(0, 0, 0, 0)
+      const monthStart = getCurrentMonthStart()
 
       const [{ count: diaryAnalyses }, { count: examAnalyses }] = await Promise.all([
         supabase
           .from('ai_analyses')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
-          .gte('created_at', monthStart.toISOString()),
+          .gte('created_at', monthStart),
         supabase
           .from('exams')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
           .not('ai_interpreted_at', 'is', null)
-          .gte('ai_interpreted_at', monthStart.toISOString()),
+          .gte('ai_interpreted_at', monthStart),
       ])
 
-      if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= PRO_MONTHLY_LIMIT) {
+      if ((diaryAnalyses ?? 0) + (examAnalyses ?? 0) >= AI_PRO_MONTHLY_LIMIT) {
         return NextResponse.json({
-          error: `Limite mensal de ${PRO_MONTHLY_LIMIT} analises com IA atingido no plano Pro.`,
+          error: `Limite mensal de ${AI_PRO_MONTHLY_LIMIT} analises com IA atingido no plano Pro.`,
         }, { status: 429 })
       }
     }

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 type Mode = 'login' | 'signup' | 'reset'
+type AuthAction = Mode | 'resend_signup'
 
 const ERRORS: Record<string, string> = {
   'Invalid login credentials':            'E-mail ou senha incorretos.',
@@ -48,7 +49,7 @@ export default function LoginForm() {
   function switchMode(m: Mode) { reset(); setMode(m) }
 
   async function submitAuth(payload: {
-    action: Mode
+    action: AuthAction
     email: string
     password?: string
     name?: string
@@ -114,6 +115,31 @@ export default function LoginForm() {
     setLoading(false)
   }
 
+  async function handleResendConfirmation() {
+    const trimmedEmail = email.trim()
+
+    if (!trimmedEmail) {
+      setError('Informe o e-mail para reenviar a confirmacao.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    const error = await submitAuth({
+      action: 'resend_signup',
+      email: trimmedEmail,
+    })
+
+    if (error) {
+      setError(translateError(error))
+    } else {
+      setSuccess('E-mail de confirmacao reenviado. Verifique sua caixa de entrada e spam.')
+    }
+
+    setLoading(false)
+  }
+
   // ── Reset de senha ─────────────────────────────────────────
   async function handleReset(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -176,11 +202,31 @@ export default function LoginForm() {
       {success && (
         <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-lg">
           <p className="text-sm text-teal-800">{success}</p>
+          {mode === 'signup' && (
+            <button
+              type="button"
+              onClick={() => void handleResendConfirmation()}
+              disabled={loading}
+              className="mt-2 text-xs font-medium text-teal-900 underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              Reenviar confirmacao
+            </button>
+          )}
         </div>
       )}
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-700">{error}</p>
+          {mode !== 'reset' && (
+            <button
+              type="button"
+              onClick={() => void handleResendConfirmation()}
+              disabled={loading}
+              className="mt-2 text-xs font-medium text-red-800 underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              Reenviar confirmacao
+            </button>
+          )}
         </div>
       )}
 

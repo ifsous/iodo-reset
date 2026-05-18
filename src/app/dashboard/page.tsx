@@ -4,8 +4,12 @@
 
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAiLimitPolicy, getCurrentMonthStart, type AiLimitWindow } from '@/lib/ai-limits'
+import { buildProgressHistory, type ProgressHistory, type ProgressHistoryLog } from '@/lib/protocol/progress-history'
+import { buildProgressionReadiness, type ProgressionReadiness, type ProgressionLog } from '@/lib/protocol/progression-readiness'
+import { buildTodayPlan, type TodayPlan, type TodayPlanLog } from '@/lib/protocol/today-plan'
 import DashboardView    from './DashboardView'
-import type { Json, PlanType, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor } from '@/lib/supabase/types'
+import type { Json, PlanType, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor, SymptomType } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Dashboard — Protocolo IODO RESET',
@@ -21,8 +25,18 @@ export interface DashboardData {
   progressionStrategy: ProgressionStrategy
   protocolAlerts:     string[]
   examSchedule:       Json
-  isPro:              boolean
+  plan:               PlanType
   analysesUsed:       number
+  analysesLimit:      number | null
+  analysesWindow:     AiLimitWindow
+  todayPlan:          TodayPlan
+  progressionReadiness: ProgressionReadiness
+  progressHistory:    ProgressHistory
+  professionalAdjustment: {
+    customDoseSuggestion: number | null
+    proNotes: string | null
+    professionalName: string | null
+  } | null
   lastLog: {
     id:           string
     semaphore:    SemaphoreColor
@@ -31,6 +45,13 @@ export interface DashboardData {
     sleep_quality: number | null
     dose_drops:   number | null
     log_date:     string
+    symptoms:     SymptomType[]
+    took_selenium: boolean
+    took_magnesium: boolean
+    took_vitamins: boolean
+    took_vitamin_c: boolean
+    drank_water: boolean
+    used_salt: boolean
   } | null
   recentLogs: {
     log_date:     string
@@ -39,6 +60,13 @@ export interface DashboardData {
     sleep_quality: number | null
     semaphore:    SemaphoreColor
     dose_drops:   number
+    symptoms:     SymptomType[]
+    took_selenium: boolean
+    took_magnesium: boolean
+    took_vitamins: boolean
+    took_vitamin_c: boolean
+    drank_water: boolean
+    used_salt: boolean
   }[]
 }
 
@@ -79,7 +107,7 @@ export default async function DashboardPage() {
   // Busca último registro diário
   const { data: lastLog } = await supabase
     .from('daily_logs')
-    .select('id, semaphore, energy, mood, sleep_quality, dose_drops, log_date')
+    .select('id, semaphore, energy, mood, sleep_quality, dose_drops, log_date, symptoms, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt')
     .eq('user_id', user.id)
     .order('log_date', { ascending: false })
     .limit(1)
@@ -91,28 +119,104 @@ export default async function DashboardPage() {
       sleep_quality: number | null
       dose_drops: number | null
       log_date: string
+      symptoms: SymptomType[]
+      took_selenium: boolean
+      took_magnesium: boolean
+      took_vitamins: boolean
+      took_vitamin_c: boolean
+      drank_water: boolean
+      used_salt: boolean
     }>()
 
   // Busca últimos 7 logs para o gráfico
   const { data: recentLogs } = await supabase
     .from('daily_logs')
-    .select('log_date, energy, mood, sleep_quality, semaphore, dose_drops')
+    .select('log_date, energy, mood, sleep_quality, semaphore, dose_drops, symptoms, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt')
     .eq('user_id', user.id)
     .order('log_date', { ascending: false })
     .limit(7)
 
-  const isPro = userData.plan === 'pro' || userData.plan === 'clinic'
-  const [{ count: diaryAnalysesUsed }, { count: examAnalysesUsed }] = await Promise.all([
-    supabase
-      .from('ai_analyses')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
-    supabase
-      .from('exams')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .not('ai_interpreted_at', 'is', null),
-  ])
+  // Busca histórico maior para padrões de progresso
+  const { data: progressLogs } = await supabase
+    .from('daily_logs')
+    .select('log_date, energy, mood, sleep_quality, semaphore, symptoms, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt')
+    .eq('user_id', user.id)
+    .order('log_date', { ascending: false })
+    .limit(30)
+
+  const { data: professionalLink } = await supabase
+    .from('pro_patients')
+    .select('professional_id, custom_dose_suggestion, pro_notes')
+    .eq('patient_id', user.id)
+    .eq('status', 'active')
+    .not('custom_dose_suggestion', 'is', null)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<{
+      professional_id: string
+      custom_dose_suggestion: number | null
+      pro_notes: string | null
+    }>()
+
+  const { data: professionalAdjustmentSource } = professionalLink
+    ? await supabase
+        .from('professionals')
+        .select('display_name')
+        .eq('id', professionalLink.professional_id)
+        .maybeSingle<{ display_name: string | null }>()
+    : { data: null }
+
+  const professionalAdjustment = professionalLink
+    ? {
+        customDoseSuggestion: professionalLink.custom_dose_suggestion,
+        proNotes: professionalLink.pro_notes,
+        professionalName: professionalAdjustmentSource?.display_name ?? null,
+      }
+    : null
+
+  const analysisPolicy = getAiLimitPolicy(userData.plan)
+  const diaryAnalysesQuery = supabase
+    .from('ai_analyses')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+  const examAnalysesQuery = supabase
+    .from('exams')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .not('ai_interpreted_at', 'is', null)
+
+  if (analysisPolicy.window === 'monthly') {
+    const monthStart = getCurrentMonthStart()
+    diaryAnalysesQuery.gte('created_at', monthStart)
+    examAnalysesQuery.gte('ai_interpreted_at', monthStart)
+  }
+
+  const [{ count: diaryAnalysesUsed }, { count: examAnalysesUsed }] = analysisPolicy.window === 'unlimited'
+    ? [{ count: 0 }, { count: 0 }]
+    : await Promise.all([diaryAnalysesQuery, examAnalysesQuery])
+
+  const todayDate = new Date().toISOString().split('T')[0]
+  const recentLogSignals = (recentLogs ?? []) as TodayPlanLog[]
+  const progressionLogSignals = (recentLogs ?? []) as ProgressionLog[]
+  const progressHistoryLogs = (progressLogs ?? []) as ProgressHistoryLog[]
+  const todayPlan = buildTodayPlan({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    alerts: profile.protocol_alerts ?? [],
+    recommendedDrops: profile.recommended_dose_drops,
+    professionalAdjustment,
+    todayLog: lastLog?.log_date === todayDate ? lastLog : null,
+    recentLogs: recentLogSignals,
+  })
+  const progressionReadiness = buildProgressionReadiness({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    protocolStartDate: profile.protocol_start_date,
+    recentLogs: progressionLogSignals,
+  })
+  const progressHistory = buildProgressHistory(progressHistoryLogs)
 
   const dashboardData: DashboardData = {
     userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
@@ -124,8 +228,14 @@ export default async function DashboardPage() {
     progressionStrategy: profile.progression_strategy ?? 'standard',
     protocolAlerts:    profile.protocol_alerts ?? [],
     examSchedule:      profile.exam_schedule ?? [],
-    isPro,
+    plan:              userData.plan,
     analysesUsed:      (diaryAnalysesUsed ?? 0) + (examAnalysesUsed ?? 0),
+    analysesLimit:     analysisPolicy.limit,
+    analysesWindow:    analysisPolicy.window,
+    todayPlan,
+    progressionReadiness,
+    progressHistory,
+    professionalAdjustment,
     lastLog:           lastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),
   }

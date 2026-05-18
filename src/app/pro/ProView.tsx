@@ -246,7 +246,7 @@ export default function ProView({ data }: { data: ProData }) {
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
   const redToday = data.patients.filter((patient) => patient.lastSemaphore === 'red').length
   const displayProfessionalName = data.professional?.displayName || data.user.fullName || 'Profissional'
-  const planLabel = data.user.isProfessional ? 'Clinica' : PLAN_LABELS[data.user.plan]
+  const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
   const slotsUsed = data.professional
     ? `${data.patients.length}/${data.professional.patientLimit}`
     : '0/0'

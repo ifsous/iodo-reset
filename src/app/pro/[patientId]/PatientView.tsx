@@ -57,30 +57,40 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
   const patient = data.patient
   const phase = patient.phase ? PHASE_LABELS[patient.phase] : 'Nao informado'
   const [notes, setNotes] = useState(patient.proNotes ?? '')
+  const [customDose, setCustomDose] = useState(patient.customDoseSuggestion?.toString() ?? '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSaved, setNotesSaved] = useState(false)
 
-  async function saveNotes() {
+  async function saveAdjustment() {
     setSavingNotes(true)
     setNotesError(null)
     setNotesSaved(false)
 
-    const response = await fetch('/api/pro/notes', {
+    const response = await fetch('/api/pro/protocol-adjustment', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ patient_id: patient.id, pro_notes: notes }),
+      body: JSON.stringify({
+        patient_id: patient.id,
+        custom_dose_suggestion: customDose.trim() === '' ? null : customDose,
+        pro_notes: notes,
+      }),
     })
 
-    const result = await response.json() as { error?: string; pro_notes?: string | null }
+    const result = await response.json() as {
+      error?: string
+      custom_dose_suggestion?: number | null
+      pro_notes?: string | null
+    }
     setSavingNotes(false)
 
     if (!response.ok) {
-      setNotesError(result.error ?? 'Erro ao salvar notas.')
+      setNotesError(result.error ?? 'Erro ao salvar ajuste.')
       return
     }
 
     setNotes(result.pro_notes ?? '')
+    setCustomDose(result.custom_dose_suggestion?.toString() ?? '')
     setNotesSaved(true)
     router.refresh()
   }
@@ -208,7 +218,32 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
           )}
         </Card>
 
-        <Card title="Notas profissionais">
+        <Card title="Ajuste profissional">
+          <div className="grid grid-cols-[1fr_auto] gap-3 mb-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600" htmlFor="custom-dose">
+                Dose sugerida
+              </label>
+              <input
+                id="custom-dose"
+                type="number"
+                min={0}
+                max={50}
+                step={1}
+                value={customDose}
+                onChange={(event) => {
+                  setCustomDose(event.target.value)
+                  setNotesSaved(false)
+                }}
+                placeholder="Sem ajuste"
+                className="mt-1 w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+              />
+            </div>
+            <div className="self-end rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 min-w-24">
+              <p className="text-[11px] text-gray-400">Atual</p>
+              <p className="text-sm font-semibold text-gray-900">{patient.recommendedDoseDrops ?? '-'} gotas</p>
+            </div>
+          </div>
           <textarea
             value={notes}
             onChange={(event) => {
@@ -217,24 +252,27 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             }}
             rows={5}
             maxLength={2000}
-            placeholder="Registre condutas combinadas, observacoes clinicas e proximos pontos de acompanhamento."
+            placeholder="Oriente o paciente sobre como aplicar este ajuste e o que observar nos proximos dias."
             className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600 resize-none"
           />
+          <p className="text-xs text-gray-500 leading-relaxed mt-2">
+            Este ajuste aparece no dashboard do paciente e passa a orientar o Plano de Hoje, salvo quando houver alerta de seguranca.
+          </p>
           <div className="flex items-center justify-between gap-3 mt-3">
             <p className="text-xs text-gray-400">{notes.length}/2000</p>
             <button
-              onClick={saveNotes}
+              onClick={saveAdjustment}
               disabled={savingNotes}
               className="px-4 py-2 rounded-lg bg-teal-800 hover:bg-teal-900 disabled:opacity-50 text-white text-sm font-medium transition-all"
             >
-              {savingNotes ? 'Salvando...' : 'Salvar notas'}
+              {savingNotes ? 'Salvando...' : 'Salvar ajuste'}
             </button>
           </div>
           {notesError && (
             <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3 mt-3">{notesError}</p>
           )}
           {notesSaved && (
-            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">Notas salvas.</p>
+            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">Ajuste salvo.</p>
           )}
         </Card>
       </main>

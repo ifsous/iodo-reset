@@ -19,6 +19,7 @@ export interface PatientDetailData {
     status: string
     alertLevel: AlertLevel
     proNotes: string | null
+    customDoseSuggestion: number | null
     phase: ProtocolPhase | null
     protocolStartDate: string | null
     recommendedDoseDrops: number | null
@@ -121,6 +122,13 @@ export default async function PatientPage({
       .limit(8),
   ])
 
+  const { data: proPatient } = await supabase
+    .from('pro_patients')
+    .select('custom_dose_suggestion, pro_notes')
+    .eq('professional_id', professional.id)
+    .eq('patient_id', patientId)
+    .maybeSingle<{ custom_dose_suggestion: number | null; pro_notes: string | null }>()
+
   const data: PatientDetailData = {
     professionalId: professional.id,
     patient: {
@@ -129,7 +137,8 @@ export default async function PatientPage({
       email: patientRow.patient_email,
       status: patientRow.status,
       alertLevel: patientRow.alert_level,
-      proNotes: patientRow.pro_notes,
+      proNotes: proPatient?.pro_notes ?? patientRow.pro_notes,
+      customDoseSuggestion: proPatient?.custom_dose_suggestion ?? null,
       phase: patientRow.protocol_phase,
       protocolStartDate: patientRow.protocol_start_date,
       recommendedDoseDrops: patientRow.recommended_dose_drops,

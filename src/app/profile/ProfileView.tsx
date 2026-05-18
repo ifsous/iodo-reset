@@ -274,7 +274,7 @@ export default function ProfileView({ data }: { data: ProfileData }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const plan = data.user.isProfessional ? 'clinic' : data.user.plan
+  const plan = data.user.isProfessional || data.user.plan === 'clinic' ? 'clinic' : data.user.plan
   const planClass = plan === 'clinic'
     ? 'bg-indigo-50 text-indigo-800 border-indigo-100'
     : plan === 'pro'

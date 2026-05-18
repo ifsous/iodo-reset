@@ -10,12 +10,14 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<{ email: string; acceptPath: string } | null>(null)
+  const [success, setSuccess] = useState<{ email: string; acceptUrl: string } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   async function submit() {
     setSaving(true)
     setError(null)
     setSuccess(null)
+    setCopied(false)
 
     const response = await fetch('/api/pro/invite', {
       method: 'POST',
@@ -38,11 +40,19 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
 
     setEmail('')
     setNotes('')
+    const acceptPath = result.accept_path ?? `/pro/accept?professional_id=${data.professionalId}`
     setSuccess({
       email: result.patient?.email ?? email,
-      acceptPath: result.accept_path ?? `/pro/accept?professional_id=${data.professionalId}`,
+      acceptUrl: new URL(acceptPath, window.location.origin).toString(),
     })
     router.refresh()
+  }
+
+  async function copyAcceptLink() {
+    if (!success) return
+
+    await navigator.clipboard.writeText(success.acceptUrl)
+    setCopied(true)
   }
 
   const remaining = Math.max(0, data.patientLimit - data.linkedCount)
@@ -108,7 +118,14 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
           {success && (
             <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
               <p className="font-medium">Convite criado para {success.email}.</p>
-              <p className="text-xs mt-1">Link de aceite: {success.acceptPath}</p>
+              <p className="text-xs mt-1 break-all">Link de aceite: {success.acceptUrl}</p>
+              <button
+                type="button"
+                onClick={() => void copyAcceptLink()}
+                className="mt-2 text-xs font-medium text-emerald-900 underline-offset-2 hover:underline"
+              >
+                {copied ? 'Link copiado' : 'Copiar link'}
+              </button>
             </div>
           )}
 
@@ -123,7 +140,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
 
         <section className="bg-amber-50 border border-amber-100 rounded-lg p-3">
           <p className="text-xs text-amber-800 leading-relaxed">
-            Nesta etapa o paciente precisa ja ter uma conta no app. O envio automatico por email entra junto com a integracao de email transacional.
+            Nesta etapa o paciente precisa ja ter uma conta no app. Depois de criar o convite, copie o link de aceite e envie ao paciente pelo canal combinado.
           </p>
         </section>
       </main>

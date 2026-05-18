@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
         .single<{ onboarding_done: boolean }>()
 
       // Redireciona para onboarding se ainda não completou
-      if (userData && !userData.onboarding_done) {
+      if (userData && !userData.onboarding_done && !next.startsWith('/profile/reset-password')) {
         return NextResponse.redirect(`${origin}/onboarding`)
       }
 

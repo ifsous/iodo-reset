@@ -3,6 +3,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import ProView from './ProView'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
@@ -56,6 +57,33 @@ type ProfessionalRow = {
   is_verified: boolean
 }
 
+async function ensureProfessionalProfile(user: {
+  id: string
+  email: string
+  full_name: string | null
+}): Promise<ProfessionalRow | null> {
+  const admin = createAdminClient()
+
+  const { data: existing } = await admin
+    .from('professionals')
+    .select('id, display_name, credential, specialty, patient_limit, is_verified')
+    .eq('user_id', user.id)
+    .maybeSingle<ProfessionalRow>()
+
+  if (existing) return existing
+
+  const { data } = await admin
+    .from('professionals')
+    .insert({
+      user_id: user.id,
+      display_name: user.full_name?.trim() || user.email.split('@')[0] || 'Profissional',
+    })
+    .select('id, display_name, credential, specialty, patient_limit, is_verified')
+    .single<ProfessionalRow>()
+
+  return data ?? null
+}
+
 type DashboardRow = {
   patient_id: string
   status: string
@@ -107,11 +135,21 @@ export default async function ProPage() {
   const hasProAccess = userData.is_professional || userData.plan === 'pro' || userData.plan === 'clinic'
   if (!hasProAccess) redirect('/dashboard')
 
-  const { data: professional } = await supabase
+  const { data: existingProfessional } = await supabase
     .from('professionals')
     .select('id, display_name, credential, specialty, patient_limit, is_verified')
     .eq('user_id', user.id)
     .maybeSingle<ProfessionalRow>()
+
+  const professional = existingProfessional ?? (
+    userData.is_professional || userData.plan === 'clinic'
+      ? await ensureProfessionalProfile({
+          id: user.id,
+          email: userData.email || user.email || '',
+          full_name: userData.full_name,
+        })
+      : null
+  )
 
   let patients: ProPatientSummary[] = []
 
