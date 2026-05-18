@@ -42,7 +42,11 @@ export interface ProData {
     displayName: string
     credential: string | null
     specialty: string | null
+    bio: string | null
     patientLimit: number
+    alertOnRed: boolean
+    alertOnYellow: boolean
+    alertEmail: string | null
     isVerified: boolean
   } | null
   patients: ProPatientSummary[]
@@ -53,7 +57,11 @@ type ProfessionalRow = {
   display_name: string
   credential: string | null
   specialty: string | null
+  bio: string | null
   patient_limit: number
+  alert_on_red: boolean
+  alert_on_yellow: boolean
+  alert_email: string | null
   is_verified: boolean
 }
 
@@ -66,7 +74,7 @@ async function ensureProfessionalProfile(user: {
 
   const { data: existing } = await admin
     .from('professionals')
-    .select('id, display_name, credential, specialty, patient_limit, is_verified')
+    .select('id, display_name, credential, specialty, bio, patient_limit, alert_on_red, alert_on_yellow, alert_email, is_verified')
     .eq('user_id', user.id)
     .maybeSingle<ProfessionalRow>()
 
@@ -78,7 +86,7 @@ async function ensureProfessionalProfile(user: {
       user_id: user.id,
       display_name: user.full_name?.trim() || user.email.split('@')[0] || 'Profissional',
     })
-    .select('id, display_name, credential, specialty, patient_limit, is_verified')
+    .select('id, display_name, credential, specialty, bio, patient_limit, alert_on_red, alert_on_yellow, alert_email, is_verified')
     .single<ProfessionalRow>()
 
   return data ?? null
@@ -137,7 +145,7 @@ export default async function ProPage() {
 
   const { data: existingProfessional } = await supabase
     .from('professionals')
-    .select('id, display_name, credential, specialty, patient_limit, is_verified')
+    .select('id, display_name, credential, specialty, bio, patient_limit, alert_on_red, alert_on_yellow, alert_email, is_verified')
     .eq('user_id', user.id)
     .maybeSingle<ProfessionalRow>()
 
@@ -194,7 +202,11 @@ export default async function ProPage() {
           displayName: professional.display_name,
           credential: professional.credential,
           specialty: professional.specialty,
+          bio: professional.bio,
           patientLimit: professional.patient_limit,
+          alertOnRed: professional.alert_on_red,
+          alertOnYellow: professional.alert_on_yellow,
+          alertEmail: professional.alert_email,
           isVerified: professional.is_verified,
         }
       : null,

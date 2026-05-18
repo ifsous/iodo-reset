@@ -1,8 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import type { ProData, ProPatientSummary } from './page'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
+
+type ProfessionalProfile = NonNullable<ProData['professional']>
 
 const PHASE_LABELS: Record<ProtocolPhase, string> = {
   '0': 'Pre-protocolo',
@@ -239,16 +242,216 @@ function EmptyState({ hasProfessionalProfile }: { hasProfessionalProfile: boolea
   )
 }
 
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 p-3">
+      <span>
+        <span className="block text-sm font-medium text-gray-900">{label}</span>
+        <span className="block text-xs text-gray-500 mt-0.5">{description}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+      />
+    </label>
+  )
+}
+
+function ProfessionalProfileCard({
+  professional,
+  onSaved,
+}: {
+  professional: ProfessionalProfile | null
+  onSaved: (professional: ProfessionalProfile) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [draft, setDraft] = useState({
+    displayName: professional?.displayName ?? '',
+    credential: professional?.credential ?? '',
+    specialty: professional?.specialty ?? '',
+    bio: professional?.bio ?? '',
+    alertEmail: professional?.alertEmail ?? '',
+    alertOnRed: professional?.alertOnRed ?? true,
+    alertOnYellow: professional?.alertOnYellow ?? false,
+  })
+
+  if (!professional) return null
+
+  function resetDraft() {
+    setDraft({
+      displayName: professional?.displayName ?? '',
+      credential: professional?.credential ?? '',
+      specialty: professional?.specialty ?? '',
+      bio: professional?.bio ?? '',
+      alertEmail: professional?.alertEmail ?? '',
+      alertOnRed: professional?.alertOnRed ?? true,
+      alertOnYellow: professional?.alertOnYellow ?? false,
+    })
+    setError(null)
+    setEditing(false)
+  }
+
+  async function save() {
+    setSaving(true)
+    setError(null)
+
+    const response = await fetch('/api/pro/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        display_name: draft.displayName,
+        credential: draft.credential,
+        specialty: draft.specialty,
+        bio: draft.bio,
+        alert_email: draft.alertEmail,
+        alert_on_red: draft.alertOnRed,
+        alert_on_yellow: draft.alertOnYellow,
+      }),
+    })
+
+    const result = await response.json() as { error?: string; professional?: ProfessionalProfile }
+    setSaving(false)
+
+    if (!response.ok || !result.professional) {
+      setError(result.error ?? 'Erro ao salvar perfil profissional.')
+      return
+    }
+
+    onSaved(result.professional)
+    setEditing(false)
+  }
+
+  return (
+    <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Perfil da clinica</h2>
+          <p className="text-xs text-gray-500 mt-1">Dados exibidos em convites e acompanhamento.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => editing ? resetDraft() : setEditing(true)}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+        >
+          {editing ? 'Cancelar' : 'Editar'}
+        </button>
+      </div>
+
+      {editing ? (
+        <div className="space-y-3 mt-4">
+          <input
+            value={draft.displayName}
+            onChange={(event) => setDraft((current) => ({ ...current, displayName: event.target.value }))}
+            placeholder="Nome publico"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-teal-600"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={draft.credential}
+              onChange={(event) => setDraft((current) => ({ ...current, credential: event.target.value }))}
+              placeholder="Registro"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-teal-600"
+            />
+            <input
+              value={draft.specialty}
+              onChange={(event) => setDraft((current) => ({ ...current, specialty: event.target.value }))}
+              placeholder="Especialidade"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-teal-600"
+            />
+          </div>
+          <textarea
+            value={draft.bio}
+            onChange={(event) => setDraft((current) => ({ ...current, bio: event.target.value }))}
+            placeholder="Bio curta para pacientes"
+            rows={3}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-teal-600 resize-none"
+          />
+          <input
+            value={draft.alertEmail}
+            onChange={(event) => setDraft((current) => ({ ...current, alertEmail: event.target.value }))}
+            placeholder="E-mail para alertas"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-teal-600"
+          />
+          <ToggleRow
+            label="Alertar em semaforo vermelho"
+            description="Usado para notificacoes clinicas criticas."
+            checked={draft.alertOnRed}
+            onChange={(checked) => setDraft((current) => ({ ...current, alertOnRed: checked }))}
+          />
+          <ToggleRow
+            label="Alertar em semaforo amarelo"
+            description="Inclui sinais de atencao e piora moderada."
+            checked={draft.alertOnYellow}
+            onChange={(checked) => setDraft((current) => ({ ...current, alertOnYellow: checked }))}
+          />
+          {error && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">{error}</p>}
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            className="w-full py-3 rounded-lg bg-teal-800 hover:bg-teal-900 disabled:opacity-60 text-white text-sm font-medium"
+          >
+            {saving ? 'Salvando...' : 'Salvar perfil'}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-lg font-semibold text-gray-950">{professional.displayName}</p>
+            <p className="text-sm text-gray-500">
+              {[professional.credential, professional.specialty].filter(Boolean).join(' - ') || 'Registro e especialidade nao informados'}
+            </p>
+          </div>
+          {professional.bio && <p className="text-sm text-gray-600 leading-relaxed">{professional.bio}</p>}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Capacidade</p>
+              <p className="text-xs font-medium text-gray-800 mt-0.5">{professional.patientLimit} pacientes</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Alertas</p>
+              <p className="text-xs font-medium text-gray-800 mt-0.5">
+                {[
+                  professional.alertOnRed ? 'vermelho' : null,
+                  professional.alertOnYellow ? 'amarelo' : null,
+                ].filter(Boolean).join(', ') || 'desativados'}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">
+            E-mail de alerta: {professional.alertEmail || 'nao informado'}
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function ProView({ data }: { data: ProData }) {
   const router = useRouter()
+  const [professional, setProfessional] = useState(data.professional)
   const activePatients = data.patients.filter((patient) => patient.status === 'active').length
   const urgentPatients = data.patients.filter((patient) => patient.alertLevel === 'urgent').length
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
   const redToday = data.patients.filter((patient) => patient.lastSemaphore === 'red').length
-  const displayProfessionalName = data.professional?.displayName || data.user.fullName || 'Profissional'
+  const displayProfessionalName = professional?.displayName || data.user.fullName || 'Profissional'
   const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
-  const slotsUsed = data.professional
-    ? `${data.patients.length}/${data.professional.patientLimit}`
+  const slotsUsed = professional
+    ? `${data.patients.length}/${professional.patientLimit}`
     : '0/0'
 
   return (
@@ -260,7 +463,7 @@ export default function ProView({ data }: { data: ProData }) {
               <p className="text-teal-100/80 text-sm mb-1">Painel profissional</p>
               <h1 className="text-white text-2xl font-semibold">{displayProfessionalName}</h1>
               <p className="text-teal-100/80 text-sm mt-1">
-                {data.professional?.specialty || 'Acompanhamento clinico do protocolo'}
+                {professional?.specialty || 'Acompanhamento clinico do protocolo'}
               </p>
             </div>
             <span className="bg-white/10 text-teal-50 border border-white/10 text-xs font-medium px-3 py-1 rounded-full">
@@ -291,6 +494,11 @@ export default function ProView({ data }: { data: ProData }) {
           <StatCard label="Semaforo vermelho" value={redToday} sub="ultimo registro" />
         </div>
 
+        <ProfessionalProfileCard
+          professional={professional}
+          onSaved={setProfessional}
+        />
+
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -300,17 +508,17 @@ export default function ProView({ data }: { data: ProData }) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => router.push('/pro/invite')}
-                disabled={!data.professional}
+                disabled={!professional}
                 className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-800 hover:bg-teal-900 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white transition-all"
               >
                 Convidar
               </button>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${
-                data.professional?.isVerified
+                professional?.isVerified
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
                   : 'bg-amber-50 text-amber-800 border-amber-100'
               }`}>
-                {data.professional?.isVerified ? 'Verificado' : 'Em revisao'}
+                {professional?.isVerified ? 'Verificado' : 'Em revisao'}
               </span>
             </div>
           </div>
@@ -323,7 +531,7 @@ export default function ProView({ data }: { data: ProData }) {
             ))}
           </div>
         ) : (
-          <EmptyState hasProfessionalProfile={Boolean(data.professional)} />
+          <EmptyState hasProfessionalProfile={Boolean(professional)} />
         )}
 
         <section className="bg-slate-900 rounded-lg p-4 text-white">
