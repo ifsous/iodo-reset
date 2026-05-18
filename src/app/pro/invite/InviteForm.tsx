@@ -10,7 +10,11 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<{ email: string; acceptUrl: string } | null>(null)
+  const [success, setSuccess] = useState<{
+    email: string
+    acceptUrl: string
+    emailDelivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
+  } | null>(null)
   const [copied, setCopied] = useState(false)
 
   async function submit() {
@@ -28,6 +32,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
     const result = await response.json() as {
       error?: string
       accept_path?: string
+      email_delivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
       patient?: { email: string }
     }
 
@@ -44,6 +49,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
     setSuccess({
       email: result.patient?.email ?? email,
       acceptUrl: new URL(acceptPath, window.location.origin).toString(),
+      emailDelivery: result.email_delivery,
     })
     router.refresh()
   }
@@ -118,6 +124,13 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
           {success && (
             <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
               <p className="font-medium">Convite criado para {success.email}.</p>
+              {success.emailDelivery?.status === 'sent' ? (
+                <p className="text-xs mt-1">E-mail enviado automaticamente ao paciente.</p>
+              ) : success.emailDelivery?.status === 'failed' ? (
+                <p className="text-xs mt-1">Nao foi possivel enviar o e-mail automatico. Copie o link abaixo e envie manualmente.</p>
+              ) : (
+                <p className="text-xs mt-1">Envio automatico pendente de configuracao. Copie o link abaixo e envie manualmente.</p>
+              )}
               <p className="text-xs mt-1 break-all">Link de aceite: {success.acceptUrl}</p>
               <button
                 type="button"
@@ -140,7 +153,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
 
         <section className="bg-amber-50 border border-amber-100 rounded-lg p-3">
           <p className="text-xs text-amber-800 leading-relaxed">
-            Nesta etapa o paciente precisa ja ter uma conta no app. Depois de criar o convite, copie o link de aceite e envie ao paciente pelo canal combinado.
+            Nesta etapa o paciente precisa ja ter uma conta no app. Com e-mail transacional configurado, o convite e enviado automaticamente; o link continua disponivel como alternativa manual.
           </p>
         </section>
       </main>

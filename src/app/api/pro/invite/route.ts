@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendProfessionalInviteEmail } from '@/lib/email/transactional'
 import type { PlanType } from '@/lib/supabase/types'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -10,6 +11,15 @@ function jsonError(message: string, status = 400) {
 
 function normalizeEmail(value: unknown) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+function getOrigin(request: Request): string {
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+
+  if (forwardedHost) return `${proto}://${forwardedHost}`
+
+  return new URL(request.url).origin
 }
 
 export async function POST(request: Request) {
@@ -39,9 +49,9 @@ export async function POST(request: Request) {
 
   const { data: professional } = await supabase
     .from('professionals')
-    .select('id, patient_limit')
+    .select('id, patient_limit, display_name')
     .eq('user_id', user.id)
-    .maybeSingle<{ id: string; patient_limit: number }>()
+    .maybeSingle<{ id: string; patient_limit: number; display_name: string }>()
 
   if (!professional) {
     return jsonError('Perfil profissional nao encontrado.', 404)
@@ -79,6 +89,8 @@ export async function POST(request: Request) {
     .maybeSingle<{ id: string; status: string }>()
 
   const now = new Date().toISOString()
+  const acceptPath = `/pro/accept?professional_id=${professional.id}`
+  const acceptUrl = new URL(acceptPath, getOrigin(request)).toString()
 
   if (existing) {
     const { data, error } = await supabase
@@ -94,12 +106,20 @@ export async function POST(request: Request) {
 
     if (error || !data) return jsonError('Erro ao atualizar convite.', 500)
 
+    const emailDelivery = await sendProfessionalInviteEmail({
+      to: patient.email,
+      patientName: patient.full_name,
+      professionalName: professional.display_name,
+      acceptUrl,
+    })
+
     return NextResponse.json({
       ok: true,
       invite_id: data.id,
       status: data.status,
+      email_delivery: emailDelivery,
       patient: { id: patient.id, email: patient.email, full_name: patient.full_name },
-      accept_path: `/pro/accept?professional_id=${professional.id}`,
+      accept_path: acceptPath,
     })
   }
 
@@ -117,11 +137,19 @@ export async function POST(request: Request) {
 
   if (error || !data) return jsonError('Erro ao criar convite.', 500)
 
+  const emailDelivery = await sendProfessionalInviteEmail({
+    to: patient.email,
+    patientName: patient.full_name,
+    professionalName: professional.display_name,
+    acceptUrl,
+  })
+
   return NextResponse.json({
     ok: true,
     invite_id: data.id,
     status: data.status,
+    email_delivery: emailDelivery,
     patient: { id: patient.id, email: patient.email, full_name: patient.full_name },
-    accept_path: `/pro/accept?professional_id=${professional.id}`,
+    accept_path: acceptPath,
   })
 }
