@@ -333,6 +333,34 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['pro_patients']['Insert']>
         Relationships: []
       }
+      pro_invites: {
+        Row: {
+          id: string
+          professional_id: string
+          patient_email: string
+          patient_id: string | null
+          status: 'pending' | 'active' | 'cancelled' | 'expired'
+          pro_notes: string | null
+          invite_sent_at: string | null
+          invite_accepted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          professional_id: string
+          patient_email: string
+          patient_id?: string | null
+          status?: 'pending' | 'active' | 'cancelled' | 'expired'
+          pro_notes?: string | null
+          invite_sent_at?: string | null
+          invite_accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['pro_invites']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       v_pro_dashboard: {

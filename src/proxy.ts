@@ -70,7 +70,8 @@ export async function proxy(request: NextRequest) {
   if (!user && isProtected) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
-    redirectUrl.searchParams.set('redirectTo', pathname)
+    redirectUrl.search = ''
+    redirectUrl.searchParams.set('redirectTo', `${pathname}${request.nextUrl.search}`)
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -84,7 +85,7 @@ export async function proxy(request: NextRequest) {
 
   // Usuário LOGADO sem onboarding tentando acessar qualquer rota protegida
   // (exceto o próprio onboarding) → /onboarding
-  if (user && isProtected && !pathname.startsWith('/onboarding')) {
+  if (user && isProtected && !pathname.startsWith('/onboarding') && !pathname.startsWith('/pro/accept')) {
     // Busca se o usuário já completou o onboarding
     const { data: userData } = await supabase
       .from('users')

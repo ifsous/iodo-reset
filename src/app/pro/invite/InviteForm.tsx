@@ -13,6 +13,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
   const [success, setSuccess] = useState<{
     email: string
     acceptUrl: string
+    needsAccount?: boolean
     emailDelivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
   } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -32,6 +33,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
     const result = await response.json() as {
       error?: string
       accept_path?: string
+      needs_account?: boolean
       email_delivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
       patient?: { email: string }
     }
@@ -49,6 +51,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
     setSuccess({
       email: result.patient?.email ?? email,
       acceptUrl: new URL(acceptPath, window.location.origin).toString(),
+      needsAccount: result.needs_account,
       emailDelivery: result.email_delivery,
     })
     router.refresh()
@@ -124,6 +127,9 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
           {success && (
             <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
               <p className="font-medium">Convite criado para {success.email}.</p>
+              {success.needsAccount && (
+                <p className="text-xs mt-1">Este paciente ainda nao tem conta. O link leva ao cadastro/login e depois ao aceite do convite.</p>
+              )}
               {success.emailDelivery?.status === 'sent' ? (
                 <p className="text-xs mt-1">E-mail enviado automaticamente ao paciente.</p>
               ) : success.emailDelivery?.status === 'failed' ? (
@@ -153,7 +159,7 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
 
         <section className="bg-amber-50 border border-amber-100 rounded-lg p-3">
           <p className="text-xs text-amber-800 leading-relaxed">
-            Nesta etapa o paciente precisa ja ter uma conta no app. Com e-mail transacional configurado, o convite e enviado automaticamente; o link continua disponivel como alternativa manual.
+            O paciente pode aceitar o convite mesmo que ainda nao tenha conta: ele cria o cadastro pelo link e volta para concluir o aceite.
           </p>
         </section>
       </main>

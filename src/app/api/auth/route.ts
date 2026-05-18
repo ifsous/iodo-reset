@@ -8,6 +8,7 @@ interface AuthPayload {
   email?: string
   password?: string
   name?: string
+  redirectTo?: string
 }
 
 function getOrigin(request: NextRequest): string {
@@ -19,6 +20,15 @@ function getOrigin(request: NextRequest): string {
   }
 
   return new URL(request.url).origin
+}
+
+function safeRedirectPath(value: unknown): string {
+  if (typeof value !== 'string') return '/dashboard'
+  const trimmed = value.trim()
+
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return '/dashboard'
+
+  return trimmed
 }
 
 export async function POST(request: NextRequest) {
@@ -44,12 +54,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'signup') {
+    const next = encodeURIComponent(safeRedirectPath(payload.redirectTo))
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: payload.name?.trim() ?? '' },
-        emailRedirectTo: `${getOrigin(request)}/auth/callback`,
+        emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
       },
     })
 
@@ -74,11 +85,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'resend_signup') {
+    const next = encodeURIComponent(safeRedirectPath(payload.redirectTo))
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${getOrigin(request)}/auth/callback`,
+        emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
       },
     })
 

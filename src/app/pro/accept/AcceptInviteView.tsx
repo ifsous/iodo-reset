@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 interface ProfessionalInvite {
   id: string
+  inviteId?: string
   displayName: string
   credential: string | null
   specialty: string | null
@@ -32,7 +33,11 @@ export default function AcceptInviteView({
     const response = await fetch('/api/pro/accept', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ professional_id: professional.id }),
+      body: JSON.stringify(
+        professional.inviteId
+          ? { invite_id: professional.inviteId }
+          : { professional_id: professional.id }
+      ),
     })
 
     const result = await response.json() as { error?: string }

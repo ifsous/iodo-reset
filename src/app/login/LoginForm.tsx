@@ -58,6 +58,7 @@ export default function LoginForm() {
     email: string
     password?: string
     name?: string
+    redirectTo?: string
   }): Promise<string | null> {
     const response = await fetch('/api/auth', {
       method: 'POST',
@@ -113,6 +114,7 @@ export default function LoginForm() {
       email: email.trim(),
       password,
       name,
+      redirectTo,
     })
 
     if (error) {
@@ -140,6 +142,7 @@ export default function LoginForm() {
     const error = await submitAuth({
       action: 'resend_signup',
       email: trimmedEmail,
+      redirectTo,
     })
 
     if (error) {
