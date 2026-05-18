@@ -7,6 +7,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
+import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
 export async function GET(request: NextRequest) {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
+                cookieStore.set(name, value, asBrowserSessionCookie(options))
               )
             } catch { /* Route Handler pode setar cookies normalmente */ }
           },

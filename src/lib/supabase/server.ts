@@ -9,6 +9,7 @@ import {
   getSupabaseServiceRoleKey,
   getSupabaseUrl,
 } from '@/lib/supabase/config'
+import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/types'
 
@@ -30,7 +31,7 @@ export async function createClient(): Promise<TypedSupabaseClient> {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, asBrowserSessionCookie(options))
             )
           } catch {
             // Server Components não podem setar cookies diretamente.
@@ -60,7 +61,7 @@ export async function createServiceClient(): Promise<TypedSupabaseClient> {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, asBrowserSessionCookie(options))
             )
           } catch { /* Server Component — middleware cobre */ }
         },

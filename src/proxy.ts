@@ -7,6 +7,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
+import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
 // Rotas que exigem login
@@ -46,7 +47,7 @@ export async function proxy(request: NextRequest) {
           supabaseResponse = NextResponse.next({ request })
           // Terceiro: replica os cookies na response (para o browser salvar)
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, asBrowserSessionCookie(options))
           )
         },
       },
