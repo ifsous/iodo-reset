@@ -44,8 +44,13 @@ export default function LoginForm() {
     () => callbackError ? translateError(callbackError) : null
   )
   const [success,  setSuccess]  = useState<string | null>(null)
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false)
 
-  function reset() { setError(null); setSuccess(null) }
+  function reset() {
+    setError(null)
+    setSuccess(null)
+    setNeedsEmailConfirmation(false)
+  }
   function switchMode(m: Mode) { reset(); setMode(m) }
 
   async function submitAuth(payload: {
@@ -77,7 +82,12 @@ export default function LoginForm() {
     })
 
     if (error) {
-      setError(translateError(error))
+      if (error.includes('Email not confirmed')) {
+        setError('Cadastro ainda nao validado. Confirme seu e-mail para ativar a conta antes de entrar.')
+        setNeedsEmailConfirmation(true)
+      } else {
+        setError(translateError(error))
+      }
       setLoading(false)
       return
     }
@@ -111,7 +121,8 @@ export default function LoginForm() {
       return
     }
 
-    setSuccess('Conta criada! Verifique seu e-mail para confirmar o cadastro.')
+    setSuccess('Conta criada! Valide seu cadastro pelo e-mail de confirmacao antes de entrar.')
+    setNeedsEmailConfirmation(true)
     setLoading(false)
   }
 
@@ -135,6 +146,7 @@ export default function LoginForm() {
       setError(translateError(error))
     } else {
       setSuccess('E-mail de confirmacao reenviado. Verifique sua caixa de entrada e spam.')
+      setNeedsEmailConfirmation(true)
     }
 
     setLoading(false)
@@ -202,7 +214,7 @@ export default function LoginForm() {
       {success && (
         <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-lg">
           <p className="text-sm text-teal-800">{success}</p>
-          {mode === 'signup' && (
+          {needsEmailConfirmation && (
             <button
               type="button"
               onClick={() => void handleResendConfirmation()}
@@ -217,15 +229,20 @@ export default function LoginForm() {
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-700">{error}</p>
-          {mode !== 'reset' && (
-            <button
-              type="button"
-              onClick={() => void handleResendConfirmation()}
-              disabled={loading}
-              className="mt-2 text-xs font-medium text-red-800 underline-offset-2 hover:underline disabled:opacity-50"
-            >
-              Reenviar confirmacao
-            </button>
+          {needsEmailConfirmation && (
+            <div className="mt-2 space-y-2">
+              <p className="text-xs text-red-700">
+                Se o e-mail nao chegou, confira spam/lixo eletronico ou solicite um novo envio.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleResendConfirmation()}
+                disabled={loading}
+                className="text-xs font-medium text-red-800 underline-offset-2 hover:underline disabled:opacity-50"
+              >
+                Reenviar e-mail de confirmacao
+              </button>
+            </div>
           )}
         </div>
       )}
