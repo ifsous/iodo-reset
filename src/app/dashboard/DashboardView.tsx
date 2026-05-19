@@ -783,6 +783,90 @@ function MiniBar({ value, color }: { value: number | null; color: string }) {
   )
 }
 
+function NotificationBell({ notifications }: { notifications: DashboardData['notifications'] }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState(notifications)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const unreadCount = items.filter((item) => item.status === 'unread').length
+
+  async function openNotification(notification: DashboardData['notifications'][number]) {
+    if (notification.status === 'unread') {
+      setBusyId(notification.id)
+      const response = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notification_id: notification.id, action: 'read' }),
+      })
+      setBusyId(null)
+
+      if (response.ok) {
+        setItems((current) => current.map((item) => (
+          item.id === notification.id ? { ...item, status: 'read' as const } : item
+        )))
+      }
+    }
+
+    if (notification.actionUrl) {
+      router.push(notification.actionUrl)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="relative w-10 h-10 rounded-lg bg-white/10 border border-white/10 text-white flex items-center justify-center hover:bg-white/15 transition-colors"
+        aria-label="Abrir notificacoes"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M15 8.5a5 5 0 10-10 0c0 5-2 5.5-2 6.5h14c0-1-2-1.5-2-6.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+          <path d="M8 17a2 2 0 004 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-semibold flex items-center justify-center border border-teal-800">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-12 w-[calc(100vw-32px)] max-w-sm bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-semibold text-gray-900">Notificacoes</p>
+            <p className="text-xs text-gray-500 mt-0.5">Convites, protocolos e mensagens ficam aqui.</p>
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {items.length === 0 ? (
+              <p className="text-sm text-gray-400 px-4 py-5">Nenhuma notificacao por enquanto.</p>
+            ) : items.map((notification) => (
+              <button
+                key={notification.id}
+                type="button"
+                disabled={busyId === notification.id}
+                onClick={() => void openNotification(notification)}
+                className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-slate-50 disabled:opacity-60"
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${notification.status === 'unread' ? 'bg-amber-400' : 'bg-gray-200'}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-gray-900">{notification.title}</span>
+                    <span className="block text-xs text-gray-500 leading-relaxed mt-0.5">{notification.body}</span>
+                    <span className="block text-[11px] text-gray-400 mt-1">
+                      {new Date(notification.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function NavBar({ showClinicAccess }: { showClinicAccess: boolean }) {
   const router   = useRouter()
   const pathname = usePathname()
@@ -867,7 +951,12 @@ export default function DashboardView({ data }: { data: DashboardData }) {
       <div className="bg-teal-800 pt-12 pb-6 px-4">
         <div className="max-w-lg mx-auto">
           <p className="text-teal-100/80 text-sm mb-1">Olá,</p>
-          <h1 className="text-white text-2xl font-semibold">{data.userName}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-white text-2xl font-semibold">{data.userName}</h1>
+            </div>
+            <NotificationBell notifications={data.notifications} />
+          </div>
           <div className="mt-3 flex items-center gap-2">
             <span className="bg-white/10 text-teal-50 border border-white/10 text-xs font-medium px-3 py-1 rounded-full">
               {PHASE_LABELS[data.phase]}

@@ -45,7 +45,7 @@ async function requireProfessional() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json() as { email?: string; pro_notes?: string }
+  const body = await request.json() as { email?: string; pro_notes?: string; allow_email_invite?: boolean }
   const email = normalizeEmail(body.email)
   const proNotes = typeof body.pro_notes === 'string'
     ? body.pro_notes.trim().slice(0, 2000) || null
@@ -69,6 +69,14 @@ export async function POST(request: Request) {
 
   if (patient?.id === user.id) {
     return jsonError('Voce nao pode convidar a propria conta.')
+  }
+
+  if (!patient && body.allow_email_invite !== true) {
+    return NextResponse.json({
+      error: 'Paciente nao encontrado na base local. Confirme se deseja enviar convite por email.',
+      code: 'email_invite_confirmation_required',
+      needs_account: true,
+    }, { status: 409 })
   }
 
   const { count: linkedCount } = await adminSupabase
@@ -158,12 +166,52 @@ export async function POST(request: Request) {
   const acceptPath = `/pro/accept?invite_id=${invite.id}`
   const acceptUrl = new URL(acceptPath, getAppOrigin()).toString()
 
-  const emailDelivery = await sendProfessionalInviteEmail({
-    to: email,
-    patientName: patient?.full_name ?? null,
-    professionalName: professional.display_name,
-    acceptUrl,
-  })
+  const emailDelivery = patient
+    ? { status: 'skipped' as const, reason: 'Paciente cadastrado; convite enviado por notificacao no app.' }
+    : await sendProfessionalInviteEmail({
+        to: email,
+        patientName: null,
+        professionalName: professional.display_name,
+        acceptUrl,
+      })
+  let notificationDelivery: 'sent' | 'not_applicable' | 'pending_schema' | 'failed' = patient ? 'sent' : 'not_applicable'
+
+  if (patient) {
+    const { error: notificationError } = await adminSupabase
+      .from('notifications')
+      .insert({
+        user_id: patient.id,
+        type: 'pro_invite',
+        title: 'Novo convite profissional',
+        body: `${professional.display_name} quer acompanhar seu protocolo no IODO RESET.`,
+        action_url: acceptPath,
+        metadata: {
+          invite_id: invite.id,
+          professional_id: professional.id,
+          professional_name: professional.display_name,
+        },
+      })
+
+    if (notificationError?.code === '42P01') {
+      notificationDelivery = 'pending_schema'
+    } else if (notificationError) {
+      notificationDelivery = 'failed'
+      await safeRecordOperationalEvent(adminSupabase, {
+        severity: 'warning',
+        area: 'notifications',
+        eventType: 'professional_invite_notification_failed',
+        message: 'Convite profissional criado, mas notificacao no app nao foi gravada.',
+        userId: patient.id,
+        userEmail: email,
+        metadata: {
+          professional_id: professional.id,
+          invite_id: invite.id,
+          error: notificationError.message,
+          code: notificationError.code,
+        },
+      })
+    }
+  }
 
   if (emailDelivery.status !== 'sent') {
     await safeRecordOperationalEvent(adminSupabase, {
@@ -189,6 +237,7 @@ export async function POST(request: Request) {
     status: invite.status,
     needs_account: !patient,
     email_delivery: emailDelivery,
+    notification_delivery: notificationDelivery,
     patient: patient ? { id: patient.id, email: patient.email, full_name: patient.full_name } : { email },
     accept_path: acceptPath,
   })
@@ -267,22 +316,54 @@ export async function PATCH(request: Request) {
 
   if (error || !data) return jsonError('Erro ao reenviar convite.', 500)
 
-  const { data: patient } = invite.patient_id
-    ? await adminSupabase
-        .from('users')
-        .select('full_name')
-        .eq('id', invite.patient_id)
-        .maybeSingle<{ full_name: string | null }>()
-    : { data: null }
-
   const acceptPath = `/pro/accept?invite_id=${invite.id}`
   const acceptUrl = new URL(acceptPath, getAppOrigin()).toString()
-  const emailDelivery = await sendProfessionalInviteEmail({
-    to: invite.patient_email,
-    patientName: patient?.full_name ?? null,
-    professionalName: professional.display_name,
-    acceptUrl,
-  })
+  const emailDelivery = invite.patient_id
+    ? { status: 'skipped' as const, reason: 'Paciente cadastrado; reenvio feito por notificacao no app.' }
+    : await sendProfessionalInviteEmail({
+        to: invite.patient_email,
+        patientName: null,
+        professionalName: professional.display_name,
+        acceptUrl,
+      })
+  let notificationDelivery: 'sent' | 'not_applicable' | 'pending_schema' | 'failed' = invite.patient_id ? 'sent' : 'not_applicable'
+
+  if (invite.patient_id) {
+    const { error: notificationError } = await adminSupabase
+      .from('notifications')
+      .insert({
+        user_id: invite.patient_id,
+        type: 'pro_invite',
+        title: 'Convite profissional reenviado',
+        body: `${professional.display_name} reenviou o convite para acompanhar seu protocolo.`,
+        action_url: acceptPath,
+        metadata: {
+          invite_id: invite.id,
+          professional_id: professional.id,
+          professional_name: professional.display_name,
+        },
+      })
+
+    if (notificationError?.code === '42P01') {
+      notificationDelivery = 'pending_schema'
+    } else if (notificationError) {
+      notificationDelivery = 'failed'
+      await safeRecordOperationalEvent(adminSupabase, {
+        severity: 'warning',
+        area: 'notifications',
+        eventType: 'professional_invite_resend_notification_failed',
+        message: 'Convite profissional reenviado, mas notificacao no app nao foi gravada.',
+        userId: invite.patient_id,
+        userEmail: invite.patient_email,
+        metadata: {
+          professional_id: professional.id,
+          invite_id: invite.id,
+          error: notificationError.message,
+          code: notificationError.code,
+        },
+      })
+    }
+  }
 
   if (emailDelivery.status !== 'sent') {
     await safeRecordOperationalEvent(adminSupabase, {
@@ -308,5 +389,6 @@ export async function PATCH(request: Request) {
     status: data.status,
     accept_path: acceptPath,
     email_delivery: emailDelivery,
+    notification_delivery: notificationDelivery,
   })
 }

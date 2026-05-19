@@ -396,6 +396,36 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['pro_guidance_history']['Insert']>
         Relationships: []
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: 'pro_invite' | 'protocol_update' | 'message' | 'system'
+          title: string
+          body: string
+          action_url: string | null
+          status: 'unread' | 'read' | 'archived'
+          metadata: Json
+          read_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: 'pro_invite' | 'protocol_update' | 'message' | 'system'
+          title: string
+          body: string
+          action_url?: string | null
+          status?: 'unread' | 'read' | 'archived'
+          metadata?: Json
+          read_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['notifications']['Insert']>
+        Relationships: []
+      }
       admin_audit_logs: {
         Row: {
           id: string

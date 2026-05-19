@@ -37,6 +37,15 @@ export interface DashboardData {
   progressHistory:    ProgressHistory
   patientInsights:    PatientInsights
   patientRetention:   PatientRetention
+  notifications: {
+    id: string
+    type: 'pro_invite' | 'protocol_update' | 'message' | 'system'
+    title: string
+    body: string
+    actionUrl: string | null
+    status: 'unread' | 'read' | 'archived'
+    createdAt: string
+  }[]
   professionalAdjustment: {
     customDoseSuggestion: number | null
     proNotes: string | null
@@ -225,6 +234,23 @@ export default async function DashboardPage() {
       }
     : null
 
+  const { data: notificationRows } = await supabase
+    .from('notifications')
+    .select('id, type, title, body, action_url, status, created_at')
+    .eq('user_id', user.id)
+    .neq('status', 'archived')
+    .order('created_at', { ascending: false })
+    .limit(8)
+    .returns<{
+      id: string
+      type: 'pro_invite' | 'protocol_update' | 'message' | 'system'
+      title: string
+      body: string
+      action_url: string | null
+      status: 'unread' | 'read' | 'archived'
+      created_at: string
+    }[]>()
+
   const analysisPolicy = getAiLimitPolicy(userData.plan)
   const diaryAnalysesQuery = supabase
     .from('ai_analyses')
@@ -314,6 +340,15 @@ export default async function DashboardPage() {
     progressHistory,
     patientInsights,
     patientRetention,
+    notifications: (notificationRows ?? []).map((notification) => ({
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      body: notification.body,
+      actionUrl: notification.action_url,
+      status: notification.status,
+      createdAt: notification.created_at,
+    })),
     professionalAdjustment,
     lastLog:           lastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),

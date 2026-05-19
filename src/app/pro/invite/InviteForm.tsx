@@ -4,21 +4,71 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { InvitePageData } from './page'
 
+type LookupResult =
+  | { status: 'found'; email: string; fullName: string | null; existingStatus: string | null }
+  | { status: 'missing'; email: string }
+
 export default function InviteForm({ data }: { data: InvitePageData }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lookup, setLookup] = useState<LookupResult | null>(null)
+  const [checking, setChecking] = useState(false)
   const [success, setSuccess] = useState<{
     email: string
     acceptUrl: string
     needsAccount?: boolean
+    notificationDelivery?: 'sent' | 'not_applicable' | 'pending_schema' | 'failed'
     emailDelivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
   } | null>(null)
   const [copied, setCopied] = useState(false)
 
-  async function submit() {
+  async function checkPatient() {
+    const normalizedEmail = email.trim().toLowerCase()
+    setChecking(true)
+    setError(null)
+    setSuccess(null)
+    setCopied(false)
+
+    const response = await fetch(`/api/pro/invite/lookup?email=${encodeURIComponent(normalizedEmail)}`)
+    const result = await response.json() as {
+      error?: string
+      found?: boolean
+      email?: string
+      patient?: { email: string; full_name: string | null; existing_status: string | null }
+    }
+
+    setChecking(false)
+
+    if (!response.ok) {
+      setLookup(null)
+      setError(result.error ?? 'Erro ao verificar paciente.')
+      return null
+    }
+
+    const nextLookup: LookupResult = result.found && result.patient
+      ? {
+          status: 'found',
+          email: result.patient.email,
+          fullName: result.patient.full_name,
+          existingStatus: result.patient.existing_status,
+        }
+      : { status: 'missing', email: result.email ?? normalizedEmail }
+
+    setLookup(nextLookup)
+    return nextLookup
+  }
+
+  async function submit(options?: { allowEmailInvite?: boolean }) {
+    const currentLookup = lookup ?? await checkPatient()
+    if (!currentLookup) return
+
+    if (currentLookup.status === 'missing' && options?.allowEmailInvite !== true) {
+      return
+    }
+
     setSaving(true)
     setError(null)
     setSuccess(null)
@@ -27,13 +77,19 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
     const response = await fetch('/api/pro/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, pro_notes: notes }),
+      body: JSON.stringify({
+        email,
+        pro_notes: notes,
+        allow_email_invite: currentLookup.status === 'missing' && options?.allowEmailInvite === true,
+      }),
     })
 
     const result = await response.json() as {
       error?: string
+      code?: string
       accept_path?: string
       needs_account?: boolean
+      notification_delivery?: 'sent' | 'not_applicable' | 'pending_schema' | 'failed'
       email_delivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
       patient?: { email: string }
     }
@@ -47,11 +103,13 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
 
     setEmail('')
     setNotes('')
+    setLookup(null)
     const acceptPath = result.accept_path ?? `/pro/accept?professional_id=${data.professionalId}`
     setSuccess({
       email: result.patient?.email ?? email,
       acceptUrl: new URL(acceptPath, window.location.origin).toString(),
       needsAccount: result.needs_account,
+      notificationDelivery: result.notification_delivery,
       emailDelivery: result.email_delivery,
     })
     router.refresh()
@@ -102,7 +160,12 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
               <input
                 type="email"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  setLookup(null)
+                  setSuccess(null)
+                  setCopied(false)
+                }}
                 placeholder="paciente@email.com"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
@@ -124,13 +187,48 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
             <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3 mt-3">{error}</p>
           )}
 
+          {lookup?.status === 'found' && (
+            <div className="text-sm text-teal-800 bg-teal-50 border border-teal-100 rounded-lg p-3 mt-3">
+              <p className="font-medium">Paciente encontrado na base.</p>
+              <p className="text-xs mt-1">
+                {lookup.fullName ? `${lookup.fullName} - ${lookup.email}` : lookup.email}
+              </p>
+              {lookup.existingStatus === 'active' ? (
+                <p className="text-xs mt-1">Este paciente ja esta vinculado como ativo.</p>
+              ) : (
+                <p className="text-xs mt-1">Ao criar o convite, ele aparecera no sino de notificacoes do paciente.</p>
+              )}
+            </div>
+          )}
+
+          {lookup?.status === 'missing' && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3 mt-3">
+              <p className="font-medium">Paciente nao encontrado na base local.</p>
+              <p className="text-xs mt-1">Deseja enviar o convite por email para {lookup.email}?</p>
+              <button
+                type="button"
+                onClick={() => void submit({ allowEmailInvite: true })}
+                disabled={saving}
+                className="mt-3 w-full rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-xs font-medium py-2.5 transition-colors"
+              >
+                {saving ? 'Enviando...' : 'Sim, enviar convite por email'}
+              </button>
+            </div>
+          )}
+
           {success && (
             <div className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
               <p className="font-medium">Convite criado para {success.email}.</p>
               {success.needsAccount && (
                 <p className="text-xs mt-1">Este paciente ainda nao tem conta. O link leva ao cadastro/login e depois ao aceite do convite.</p>
               )}
-              {success.emailDelivery?.status === 'sent' ? (
+              {success.notificationDelivery === 'sent' ? (
+                <p className="text-xs mt-1">Notificacao enviada no sino do paciente.</p>
+              ) : success.notificationDelivery === 'pending_schema' ? (
+                <p className="text-xs mt-1">Convite criado. A notificacao no sino depende da migration de notificacoes no Supabase.</p>
+              ) : success.notificationDelivery === 'failed' ? (
+                <p className="text-xs mt-1">Convite criado, mas nao foi possivel criar a notificacao no sino.</p>
+              ) : success.emailDelivery?.status === 'sent' ? (
                 <p className="text-xs mt-1">E-mail enviado automaticamente ao paciente.</p>
               ) : success.emailDelivery?.status === 'failed' ? (
                 <p className="text-xs mt-1">Nao foi possivel enviar o e-mail automatico. Copie o link abaixo e envie manualmente.</p>
@@ -149,11 +247,11 @@ export default function InviteForm({ data }: { data: InvitePageData }) {
           )}
 
           <button
-            onClick={submit}
-            disabled={saving || remaining <= 0}
+            onClick={() => void submit()}
+            disabled={saving || checking || remaining <= 0 || lookup?.status === 'missing'}
             className="w-full mt-4 py-3 rounded-lg bg-teal-800 hover:bg-teal-900 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium transition-all"
           >
-            {saving ? 'Enviando...' : 'Criar convite'}
+            {checking ? 'Verificando...' : saving ? 'Enviando...' : lookup?.status === 'found' ? 'Criar convite no app' : 'Verificar paciente'}
           </button>
         </section>
 

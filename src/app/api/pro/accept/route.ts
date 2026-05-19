@@ -95,6 +95,17 @@ export async function POST(request: Request) {
       })
       .eq('id', invite.id)
 
+    await adminSupabase
+      .from('notifications')
+      .update({
+        status: 'read',
+        read_at: now,
+        updated_at: now,
+      })
+      .eq('user_id', user.id)
+      .eq('type', 'pro_invite')
+      .contains('metadata', { invite_id: invite.id })
+
     return NextResponse.json({ ok: true, status: linkResult.data.status })
   }
 
