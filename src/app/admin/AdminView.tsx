@@ -3,19 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlanType } from '@/lib/supabase/types'
-
-type AdminUser = {
-  id: string
-  email: string
-  full_name: string | null
-  plan: PlanType
-  is_professional: boolean
-  onboarding_done: boolean
-  plan_started_at: string | null
-  plan_expires_at: string | null
-  created_at: string
-  updated_at: string
-}
+import type { AdminUser } from '@/lib/admin-users'
 
 type Patch = {
   plan?: PlanType
@@ -35,6 +23,17 @@ function formatDate(value: string | null): string {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+  })
+}
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -66,20 +65,47 @@ function Toggle({ active, label, onClick, disabled }: {
   )
 }
 
+function Metric({ label, value, tone = 'gray' }: {
+  label: string
+  value: number
+  tone?: 'gray' | 'amber' | 'sky' | 'teal'
+}) {
+  const toneClass = {
+    gray: 'bg-white text-gray-950 border-gray-200/70',
+    amber: 'bg-amber-50 text-amber-950 border-amber-100',
+    sky: 'bg-sky-50 text-sky-950 border-sky-100',
+    teal: 'bg-teal-50 text-teal-950 border-teal-100',
+  }[tone]
+
+  return (
+    <div className={`rounded-lg border p-4 shadow-sm ${toneClass}`}>
+      <p className="text-xs font-medium opacity-70">{label}</p>
+      <p className="text-2xl font-semibold mt-1">{value}</p>
+    </div>
+  )
+}
+
 export default function AdminView({ adminEmail, initialUsers }: { adminEmail: string; initialUsers: AdminUser[] }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const [planFilter, setPlanFilter] = useState<PlanType | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [actionId, setActionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   async function loadUsers(search = query) {
     setLoading(true)
     setError(null)
+    setNotice(null)
 
     const params = new URLSearchParams()
     if (search.trim()) params.set('q', search.trim())
+    if (planFilter !== 'all') params.set('plan', planFilter)
+    if (statusFilter !== 'all') params.set('status', statusFilter)
 
     const response = await fetch(`/api/admin/users?${params.toString()}`)
     const result = await response.json() as { users?: AdminUser[]; error?: string }
@@ -97,6 +123,7 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
   async function updateUser(userId: string, patch: Patch) {
     setSavingId(userId)
     setError(null)
+    setNotice(null)
 
     const response = await fetch('/api/admin/users', {
       method: 'PATCH',
@@ -113,6 +140,35 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
 
     setUsers((current) => current.map((user) => user.id === userId ? result.user! : user))
     setSavingId(null)
+  }
+
+  async function resendConfirmation(userId: string) {
+    setActionId(userId)
+    setError(null)
+    setNotice(null)
+
+    const response = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'resend_confirmation', user_id: userId }),
+    })
+    const result = await response.json() as { message?: string; error?: string }
+
+    if (!response.ok) {
+      setError(result.error ?? 'Erro ao reenviar confirmacao.')
+      setActionId(null)
+      return
+    }
+
+    setNotice(result.message ?? 'Confirmacao reenviada.')
+    setActionId(null)
+  }
+
+  const summary = {
+    total: users.length,
+    pendingEmail: users.filter((user) => !user.email_confirmed_at).length,
+    onboardingPending: users.filter((user) => !user.onboarding_done).length,
+    professionals: users.filter((user) => user.is_professional).length,
   }
 
   return (
@@ -134,9 +190,16 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
       </header>
 
       <main className="max-w-5xl mx-auto px-4 pt-4 space-y-4">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Metric label="Usuarios" value={summary.total} />
+          <Metric label="E-mail pendente" value={summary.pendingEmail} tone="amber" />
+          <Metric label="Onboarding pendente" value={summary.onboardingPending} tone="sky" />
+          <Metric label="Profissionais" value={summary.professionals} tone="teal" />
+        </section>
+
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
           <form
-            className="flex flex-col sm:flex-row gap-3"
+            className="grid gap-3 lg:grid-cols-[1fr_150px_190px_auto]"
             onSubmit={(event) => {
               event.preventDefault()
               void loadUsers(query)
@@ -148,6 +211,27 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
               placeholder="Buscar por email ou nome"
               className="flex-1 rounded-lg border border-gray-200 bg-white text-gray-950 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
             />
+            <select
+              value={planFilter}
+              onChange={(event) => setPlanFilter(event.target.value as PlanType | 'all')}
+              className="rounded-lg border border-gray-200 bg-white text-gray-950 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+            >
+              <option value="all">Todos planos</option>
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+              <option value="clinic">Clinica</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-gray-200 bg-white text-gray-950 px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+            >
+              <option value="all">Todos status</option>
+              <option value="pending_email">E-mail pendente</option>
+              <option value="confirmed">E-mail confirmado</option>
+              <option value="onboarding_pending">Onboarding pendente</option>
+              <option value="professional">Profissionais</option>
+            </select>
             <button
               type="submit"
               className="rounded-lg bg-teal-800 text-white text-sm font-medium px-5 py-3 hover:bg-teal-900 transition-colors"
@@ -160,6 +244,11 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
         {error && (
           <div className="bg-red-50 border border-red-100 rounded-lg p-3">
             <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+        {notice && (
+          <div className="bg-teal-50 border border-teal-100 rounded-lg p-3">
+            <p className="text-sm text-teal-800">{notice}</p>
           </div>
         )}
 
@@ -189,10 +278,19 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
                             Professional
                           </span>
                         )}
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                          user.email_confirmed_at
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                            : 'bg-amber-50 text-amber-800 border-amber-100'
+                        }`}>
+                          {user.email_confirmed_at ? 'E-mail confirmado' : 'E-mail pendente'}
+                        </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1 break-all">{user.email}</p>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-400">
                         <span>Cadastro: {formatDate(user.created_at)}</span>
+                        <span>Confirmacao: {formatDate(user.email_confirmed_at)}</span>
+                        <span>Ultimo login: {formatDateTime(user.last_sign_in_at)}</span>
                         <span>Onboarding: {user.onboarding_done ? 'sim' : 'nao'}</span>
                         <span>Plano desde: {formatDate(user.plan_started_at)}</span>
                       </div>
@@ -229,6 +327,16 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
                             disabled={saving}
                             onClick={() => void updateUser(user.id, { onboarding_done: !user.onboarding_done })}
                           />
+                          {!user.email_confirmed_at && (
+                            <button
+                              type="button"
+                              disabled={actionId === user.id || saving}
+                              onClick={() => void resendConfirmation(user.id)}
+                              className="px-3 py-2 rounded-lg border text-xs font-medium bg-amber-50 text-amber-800 border-amber-100 hover:bg-amber-100 transition-colors disabled:opacity-60"
+                            >
+                              {actionId === user.id ? 'Reenviando...' : 'Reenviar confirmacao'}
+                            </button>
+                          )}
                         </div>
                       </div>
 

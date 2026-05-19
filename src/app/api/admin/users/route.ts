@@ -4,6 +4,12 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/adminAuth'
 import type { PlanType } from '@/lib/supabase/types'
+import {
+  ADMIN_USER_SELECT,
+  enrichAdminUsers,
+  filterAdminUsersByStatus,
+  type AdminUserRow,
+} from '@/lib/admin-users'
 
 const VALID_PLANS = new Set<PlanType>(['free', 'pro', 'clinic'])
 
@@ -14,17 +20,9 @@ type AdminUserPatch = {
   onboarding_done?: boolean
 }
 
-type AdminUserRow = {
-  id: string
-  email: string
-  full_name: string | null
-  plan: PlanType
-  is_professional: boolean
-  onboarding_done: boolean
-  plan_started_at: string | null
-  plan_expires_at: string | null
-  created_at: string
-  updated_at: string
+type AdminUserAction = {
+  action?: 'resend_confirmation'
+  user_id?: string
 }
 
 async function requireAdmin(): Promise<NextResponse | null> {
@@ -43,6 +41,15 @@ function cleanSearch(value: string | null): string {
     .trim()
     .replace(/[%,]/g, '')
     .slice(0, 80)
+}
+
+function getOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+
+  if (forwardedHost) return `${proto}://${forwardedHost}`
+
+  return new URL(request.url).origin
 }
 
 async function ensureProfessionalProfile(
@@ -70,16 +77,22 @@ export async function GET(request: NextRequest) {
   if (admin) return admin
 
   const search = cleanSearch(request.nextUrl.searchParams.get('q'))
+  const plan = request.nextUrl.searchParams.get('plan')
+  const status = request.nextUrl.searchParams.get('status') ?? 'all'
   const supabase = createAdminClient()
 
   let query = supabase
     .from('users')
-    .select('id, email, full_name, plan, is_professional, onboarding_done, plan_started_at, plan_expires_at, created_at, updated_at')
+    .select(ADMIN_USER_SELECT)
     .order('created_at', { ascending: false })
-    .limit(30)
+    .limit(100)
 
   if (search) {
     query = query.or(`email.ilike.%${search}%,full_name.ilike.%${search}%`)
+  }
+
+  if (plan && VALID_PLANS.has(plan as PlanType)) {
+    query = query.eq('plan', plan as PlanType)
   }
 
   const { data, error } = await query
@@ -88,7 +101,51 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ users: data ?? [] })
+  const enrichedUsers = await enrichAdminUsers(supabase, (data ?? []) as AdminUserRow[])
+
+  return NextResponse.json({
+    users: filterAdminUsersByStatus(enrichedUsers, status),
+  })
+}
+
+export async function POST(request: NextRequest) {
+  const admin = await requireAdmin()
+  if (admin) return admin
+
+  const payload = await request.json().catch(() => ({})) as AdminUserAction
+  if (payload.action !== 'resend_confirmation' || !payload.user_id) {
+    return NextResponse.json({ error: 'Acao admin invalida.' }, { status: 400 })
+  }
+
+  const supabase = createAdminClient()
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('id, email')
+    .eq('id', payload.user_id)
+    .single<{ id: string; email: string }>()
+
+  if (userError || !user) {
+    return NextResponse.json({ error: userError?.message ?? 'Usuario nao encontrado.' }, { status: 404 })
+  }
+
+  const { data: authUser } = await supabase.auth.admin.getUserById(user.id)
+  if (authUser.user?.email_confirmed_at) {
+    return NextResponse.json({ ok: true, message: 'Este e-mail ja esta confirmado.' })
+  }
+
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: user.email,
+    options: {
+      emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${encodeURIComponent('/dashboard')}`,
+    },
+  })
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, message: 'Confirmacao reenviada.' })
 }
 
 export async function PATCH(request: NextRequest) {
@@ -138,7 +195,7 @@ export async function PATCH(request: NextRequest) {
     .from('users')
     .update(update)
     .eq('id', payload.user_id)
-    .select('id, email, full_name, plan, is_professional, onboarding_done, plan_started_at, plan_expires_at, created_at, updated_at')
+    .select(ADMIN_USER_SELECT)
     .single<AdminUserRow>()
 
   if (error) {
@@ -155,5 +212,7 @@ export async function PATCH(request: NextRequest) {
   revalidatePath('/pro')
   revalidatePath('/exams')
 
-  return NextResponse.json({ user: data })
+  const [enrichedUser] = await enrichAdminUsers(supabase, [data])
+
+  return NextResponse.json({ user: enrichedUser })
 }

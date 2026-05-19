@@ -2,6 +2,12 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/adminAuth'
+import {
+  ADMIN_USER_SELECT,
+  enrichAdminUsers,
+  filterAdminUsersByStatus,
+  type AdminUserRow,
+} from '@/lib/admin-users'
 import AdminView from './AdminView'
 
 export const metadata = {
@@ -18,9 +24,16 @@ export default async function AdminPage() {
   const adminSupabase = createAdminClient()
   const { data: users } = await adminSupabase
     .from('users')
-    .select('id, email, full_name, plan, is_professional, onboarding_done, plan_started_at, plan_expires_at, created_at, updated_at')
+    .select(ADMIN_USER_SELECT)
     .order('created_at', { ascending: false })
-    .limit(30)
+    .limit(50)
 
-  return <AdminView adminEmail={user.email ?? ''} initialUsers={users ?? []} />
+  const enrichedUsers = await enrichAdminUsers(adminSupabase, (users ?? []) as AdminUserRow[])
+
+  return (
+    <AdminView
+      adminEmail={user.email ?? ''}
+      initialUsers={filterAdminUsersByStatus(enrichedUsers, 'all')}
+    />
+  )
 }
