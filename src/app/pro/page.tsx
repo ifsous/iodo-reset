@@ -31,6 +31,18 @@ export interface ProPatientSummary {
   triage: ProTriage
 }
 
+export interface ProInviteSummary {
+  id: string
+  patientEmail: string
+  patientId: string | null
+  status: 'pending' | 'active' | 'cancelled' | 'expired'
+  proNotes: string | null
+  inviteSentAt: string | null
+  inviteAcceptedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ProData {
   user: {
     id: string
@@ -52,6 +64,7 @@ export interface ProData {
     isVerified: boolean
   } | null
   patients: ProPatientSummary[]
+  invites: ProInviteSummary[]
 }
 
 type ProfessionalRow = {
@@ -112,6 +125,18 @@ type DashboardRow = {
   last_dose_drops: number | null
 }
 
+type InviteRow = {
+  id: string
+  patient_email: string
+  patient_id: string | null
+  status: 'pending' | 'active' | 'cancelled' | 'expired'
+  pro_notes: string | null
+  invite_sent_at: string | null
+  invite_accepted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 function sortPatients(a: ProPatientSummary, b: ProPatientSummary) {
   const scoreDiff = b.triage.score - a.triage.score
   if (scoreDiff !== 0) return scoreDiff
@@ -161,12 +186,21 @@ export default async function ProPage() {
   )
 
   let patients: ProPatientSummary[] = []
+  let invites: ProInviteSummary[] = []
 
   if (professional) {
-    const { data: rows } = await supabase
-      .from('v_pro_dashboard')
-      .select('patient_id, status, alert_level, pro_notes, patient_name, patient_email, protocol_phase, protocol_start_date, recommended_dose_drops, protocol_day, last_log_date, last_semaphore, last_energy, last_mood, last_dose_drops')
-      .eq('professional_id', professional.id)
+    const [{ data: rows }, { data: inviteRows }] = await Promise.all([
+      supabase
+        .from('v_pro_dashboard')
+        .select('patient_id, status, alert_level, pro_notes, patient_name, patient_email, protocol_phase, protocol_start_date, recommended_dose_drops, protocol_day, last_log_date, last_semaphore, last_energy, last_mood, last_dose_drops')
+        .eq('professional_id', professional.id),
+      supabase
+        .from('pro_invites')
+        .select('id, patient_email, patient_id, status, pro_notes, invite_sent_at, invite_accepted_at, created_at, updated_at')
+        .eq('professional_id', professional.id)
+        .order('updated_at', { ascending: false })
+        .limit(20),
+    ])
 
     patients = ((rows ?? []) as DashboardRow[])
       .map((row) => {
@@ -200,6 +234,18 @@ export default async function ProPage() {
         }
       })
       .sort(sortPatients)
+
+    invites = ((inviteRows ?? []) as InviteRow[]).map((invite) => ({
+      id: invite.id,
+      patientEmail: invite.patient_email,
+      patientId: invite.patient_id,
+      status: invite.status,
+      proNotes: invite.pro_notes,
+      inviteSentAt: invite.invite_sent_at,
+      inviteAcceptedAt: invite.invite_accepted_at,
+      createdAt: invite.created_at,
+      updatedAt: invite.updated_at,
+    }))
   }
 
   const data: ProData = {
@@ -225,6 +271,7 @@ export default async function ProPage() {
         }
       : null,
     patients,
+    invites,
   }
 
   return <ProView data={data} />

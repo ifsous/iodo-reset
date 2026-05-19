@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import type { ProData, ProPatientSummary } from './page'
+import type { ProData, ProInviteSummary, ProPatientSummary } from './page'
 import type { ProTriageLevel } from '@/lib/pro-triage'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
@@ -36,6 +36,25 @@ const ALERT_CONFIG: Record<AlertLevel, { label: string; dot: string; badge: stri
   urgent: {
     label: 'Urgente',
     dot: 'bg-red-500',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+  },
+}
+
+const INVITE_STATUS_CONFIG: Record<ProInviteSummary['status'], { label: string; badge: string }> = {
+  pending: {
+    label: 'Pendente',
+    badge: 'bg-amber-50 text-amber-800 border-amber-100',
+  },
+  active: {
+    label: 'Aceito',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+  },
+  cancelled: {
+    label: 'Cancelado',
+    badge: 'bg-gray-50 text-gray-500 border-gray-100',
+  },
+  expired: {
+    label: 'Expirado',
     badge: 'bg-red-50 text-red-800 border-red-100',
   },
 }
@@ -88,6 +107,16 @@ function formatDate(date: string | null) {
   return new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'short',
+  })
+}
+
+function formatDateTime(date: string | null) {
+  if (!date) return 'Sem envio'
+  return new Date(date).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
   })
 }
 
@@ -505,9 +534,129 @@ function ProfessionalProfileCard({
   )
 }
 
+function InviteManagementCard({
+  invites,
+  onInvitesChange,
+}: {
+  invites: ProInviteSummary[]
+  onInvitesChange: (invites: ProInviteSummary[]) => void
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const pendingInvites = invites.filter((invite) => invite.status === 'pending')
+  const visibleInvites = invites.slice(0, 6)
+
+  async function updateInvite(inviteId: string, action: 'resend' | 'cancel') {
+    setBusyId(inviteId)
+    setNotice(null)
+    setError(null)
+
+    const response = await fetch('/api/pro/invite', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invite_id: inviteId, action }),
+    })
+    const result = await response.json() as {
+      error?: string
+      status?: ProInviteSummary['status']
+      email_delivery?: { status: 'sent' | 'skipped' | 'failed'; reason?: string }
+    }
+
+    if (!response.ok || !result.status) {
+      setError(result.error ?? 'Erro ao atualizar convite.')
+      setBusyId(null)
+      return
+    }
+
+    onInvitesChange(invites.map((invite) => (
+      invite.id === inviteId
+        ? {
+            ...invite,
+            status: result.status!,
+            inviteSentAt: action === 'resend' ? new Date().toISOString() : invite.inviteSentAt,
+            updatedAt: new Date().toISOString(),
+          }
+        : invite
+    )))
+
+    if (action === 'resend') {
+      setNotice(result.email_delivery?.status === 'sent'
+        ? 'Convite reenviado por e-mail.'
+        : 'Convite atualizado. Envio automatico nao confirmado; envie o link manualmente se necessario.')
+    } else {
+      setNotice('Convite cancelado.')
+    }
+    setBusyId(null)
+  }
+
+  return (
+    <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">Convites e vinculos</h2>
+          <p className="text-xs text-gray-500 mt-1">{pendingInvites.length} convite{pendingInvites.length === 1 ? '' : 's'} pendente{pendingInvites.length === 1 ? '' : 's'}</p>
+        </div>
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-100">
+          {pendingInvites.length} pendente
+        </span>
+      </div>
+
+      {notice && <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-2 mt-3">{notice}</p>}
+      {error && <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2 mt-3">{error}</p>}
+
+      {visibleInvites.length === 0 ? (
+        <p className="text-sm text-gray-500 py-4">Nenhum convite criado ainda.</p>
+      ) : (
+        <div className="space-y-2 mt-3">
+          {visibleInvites.map((invite) => {
+            const status = INVITE_STATUS_CONFIG[invite.status]
+            const isPending = invite.status === 'pending' || invite.status === 'expired' || invite.status === 'cancelled'
+            return (
+              <div key={invite.id} className="rounded-lg border border-gray-100 bg-slate-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{invite.patientEmail}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Enviado: {formatDateTime(invite.inviteSentAt)}</p>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${status.badge}`}>
+                    {status.label}
+                  </span>
+                </div>
+                {invite.proNotes && (
+                  <p className="text-xs text-gray-500 leading-relaxed mt-2 line-clamp-2">{invite.proNotes}</p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    disabled={!isPending || busyId === invite.id}
+                    onClick={() => void updateInvite(invite.id, 'resend')}
+                    className="flex-1 rounded-lg border border-teal-100 bg-white text-teal-800 text-xs font-medium py-2 hover:bg-teal-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {busyId === invite.id ? 'Aguarde...' : 'Reenviar'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={invite.status === 'active' || invite.status === 'cancelled' || busyId === invite.id}
+                    onClick={() => void updateInvite(invite.id, 'cancel')}
+                    className="flex-1 rounded-lg border border-red-100 bg-white text-red-700 text-xs font-medium py-2 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function ProView({ data }: { data: ProData }) {
   const router = useRouter()
   const [professional, setProfessional] = useState(data.professional)
+  const [invites, setInvites] = useState(data.invites)
   const activePatients = data.patients.filter((patient) => patient.status === 'active').length
   const urgentPatients = data.patients.filter((patient) => patient.alertLevel === 'urgent').length
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
@@ -516,7 +665,7 @@ export default function ProView({ data }: { data: ProData }) {
   const displayProfessionalName = professional?.displayName || data.user.fullName || 'Profissional'
   const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
   const slotsUsed = professional
-    ? `${data.patients.length}/${professional.patientLimit}`
+    ? `${data.patients.length + invites.filter((invite) => invite.status === 'pending' && !invite.patientId).length}/${professional.patientLimit}`
     : '0/0'
 
   return (
@@ -564,6 +713,11 @@ export default function ProView({ data }: { data: ProData }) {
         <ProfessionalProfileCard
           professional={professional}
           onSaved={setProfessional}
+        />
+
+        <InviteManagementCard
+          invites={invites}
+          onInvitesChange={setInvites}
         />
 
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">

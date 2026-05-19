@@ -24,12 +24,35 @@ function getOrigin(request: Request): string {
   return new URL(request.url).origin
 }
 
-export async function POST(request: Request) {
+async function requireProfessional() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return jsonError('Nao autenticado.', 401)
+  if (!user) return { error: jsonError('Nao autenticado.', 401) }
 
+  const { data: userData } = await supabase
+    .from('users')
+    .select('plan, is_professional')
+    .eq('id', user.id)
+    .single<{ plan: PlanType; is_professional: boolean }>()
+
+  const hasProAccess = userData?.is_professional || userData?.plan === 'pro' || userData?.plan === 'clinic'
+  if (!hasProAccess) return { error: jsonError('Acesso profissional necessario.', 403) }
+
+  const { data: professional } = await supabase
+    .from('professionals')
+    .select('id, patient_limit, display_name')
+    .eq('user_id', user.id)
+    .maybeSingle<{ id: string; patient_limit: number; display_name: string }>()
+
+  if (!professional) {
+    return { error: jsonError('Perfil profissional nao encontrado.', 404) }
+  }
+
+  return { supabase, user, professional }
+}
+
+export async function POST(request: Request) {
   const body = await request.json() as { email?: string; pro_notes?: string }
   const email = normalizeEmail(body.email)
   const proNotes = typeof body.pro_notes === 'string'
@@ -40,24 +63,9 @@ export async function POST(request: Request) {
     return jsonError('Informe um email valido.')
   }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('plan, is_professional')
-    .eq('id', user.id)
-    .single<{ plan: PlanType; is_professional: boolean }>()
-
-  const hasProAccess = userData?.is_professional || userData?.plan === 'pro' || userData?.plan === 'clinic'
-  if (!hasProAccess) return jsonError('Acesso profissional necessario.', 403)
-
-  const { data: professional } = await supabase
-    .from('professionals')
-    .select('id, patient_limit, display_name')
-    .eq('user_id', user.id)
-    .maybeSingle<{ id: string; patient_limit: number; display_name: string }>()
-
-  if (!professional) {
-    return jsonError('Perfil profissional nao encontrado.', 404)
-  }
+  const access = await requireProfessional()
+  if (access.error) return access.error
+  const { user, professional } = access
 
   const adminSupabase = createAdminClient()
 
@@ -191,5 +199,122 @@ export async function POST(request: Request) {
     email_delivery: emailDelivery,
     patient: patient ? { id: patient.id, email: patient.email, full_name: patient.full_name } : { email },
     accept_path: acceptPath,
+  })
+}
+
+export async function PATCH(request: Request) {
+  const access = await requireProfessional()
+  if (access.error) return access.error
+  const { professional } = access
+
+  const body = await request.json().catch(() => ({})) as {
+    invite_id?: string
+    action?: 'resend' | 'cancel'
+  }
+  const inviteId = typeof body.invite_id === 'string' ? body.invite_id.trim() : ''
+
+  if (!inviteId || (body.action !== 'resend' && body.action !== 'cancel')) {
+    return jsonError('Acao de convite invalida.')
+  }
+
+  const adminSupabase = createAdminClient()
+  const { data: invite } = await adminSupabase
+    .from('pro_invites')
+    .select('id, professional_id, patient_email, patient_id, status, pro_notes')
+    .eq('id', inviteId)
+    .eq('professional_id', professional.id)
+    .maybeSingle<{
+      id: string
+      professional_id: string
+      patient_email: string
+      patient_id: string | null
+      status: 'pending' | 'active' | 'cancelled' | 'expired'
+      pro_notes: string | null
+    }>()
+
+  if (!invite) return jsonError('Convite nao encontrado.', 404)
+
+  if (body.action === 'cancel') {
+    if (invite.status === 'active') {
+      return jsonError('Convite ja aceito. Encerre o vinculo pelo paciente.', 409)
+    }
+
+    const now = new Date().toISOString()
+    const { data, error } = await adminSupabase
+      .from('pro_invites')
+      .update({ status: 'cancelled', updated_at: now })
+      .eq('id', invite.id)
+      .select('id, status')
+      .single<{ id: string; status: string }>()
+
+    if (error || !data) return jsonError('Erro ao cancelar convite.', 500)
+
+    if (invite.patient_id) {
+      await adminSupabase
+        .from('pro_patients')
+        .update({ status: 'ended' })
+        .eq('professional_id', professional.id)
+        .eq('patient_id', invite.patient_id)
+        .eq('status', 'pending')
+    }
+
+    return NextResponse.json({ ok: true, invite_id: invite.id, status: data.status })
+  }
+
+  if (invite.status === 'active') {
+    return jsonError('Convite ja aceito.', 409)
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await adminSupabase
+    .from('pro_invites')
+    .update({ status: 'pending', invite_sent_at: now, updated_at: now })
+    .eq('id', invite.id)
+    .select('id, status')
+    .single<{ id: string; status: string }>()
+
+  if (error || !data) return jsonError('Erro ao reenviar convite.', 500)
+
+  const { data: patient } = invite.patient_id
+    ? await adminSupabase
+        .from('users')
+        .select('full_name')
+        .eq('id', invite.patient_id)
+        .maybeSingle<{ full_name: string | null }>()
+    : { data: null }
+
+  const acceptPath = `/pro/accept?invite_id=${invite.id}`
+  const acceptUrl = new URL(acceptPath, getOrigin(request)).toString()
+  const emailDelivery = await sendProfessionalInviteEmail({
+    to: invite.patient_email,
+    patientName: patient?.full_name ?? null,
+    professionalName: professional.display_name,
+    acceptUrl,
+  })
+
+  if (emailDelivery.status !== 'sent') {
+    await safeRecordOperationalEvent(adminSupabase, {
+      severity: emailDelivery.status === 'failed' ? 'critical' : 'warning',
+      area: 'email',
+      eventType: `professional_invite_resend_${emailDelivery.status}`,
+      message: emailDelivery.status === 'failed'
+        ? 'Falha ao reenviar convite profissional por e-mail.'
+        : 'Reenvio de convite profissional pendente de configuracao.',
+      userId: invite.patient_id,
+      userEmail: invite.patient_email,
+      metadata: {
+        reason: emailDelivery.reason,
+        professional_id: professional.id,
+        invite_id: invite.id,
+      },
+    })
+  }
+
+  return NextResponse.json({
+    ok: true,
+    invite_id: invite.id,
+    status: data.status,
+    accept_path: acceptPath,
+    email_delivery: emailDelivery,
   })
 }
