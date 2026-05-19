@@ -3,8 +3,13 @@
 
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import {
+  buildProPatientClinicalSummary,
+  type ProPatientClinicalSummary,
+  type ProPatientSignalLog,
+} from '@/lib/pro-patient-clinical-summary'
 import PatientView from './PatientView'
-import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
+import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor, SymptomType } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Paciente - IODO RESET Pro',
@@ -37,6 +42,13 @@ export interface PatientDetailData {
     mood: number | null
     sleepQuality: number | null
     doseDrops: number
+    symptoms: SymptomType[]
+    tookSelenium: boolean
+    tookMagnesium: boolean
+    tookVitamins: boolean
+    tookVitaminC: boolean
+    drankWater: boolean
+    usedSalt: boolean
   }[]
   exams: {
     id: string
@@ -47,6 +59,7 @@ export interface PatientDetailData {
     isWithinRange: boolean | null
     aiInterpretation: string | null
   }[]
+  clinicalSummary: ProPatientClinicalSummary
 }
 
 type DashboardRow = {
@@ -66,6 +79,22 @@ type DashboardRow = {
   last_energy: number | null
   last_mood: number | null
   last_dose_drops: number | null
+}
+
+type DailyLogRow = {
+  log_date: string
+  semaphore: SemaphoreColor
+  energy: number | null
+  mood: number | null
+  sleep_quality: number | null
+  dose_drops: number
+  symptoms: SymptomType[] | null
+  took_selenium: boolean | null
+  took_magnesium: boolean | null
+  took_vitamins: boolean | null
+  took_vitamin_c: boolean | null
+  drank_water: boolean | null
+  used_salt: boolean | null
 }
 
 export default async function PatientPage({
@@ -110,10 +139,11 @@ export default async function PatientPage({
   const [{ data: logs }, { data: exams }] = await Promise.all([
     supabase
       .from('daily_logs')
-      .select('log_date, semaphore, energy, mood, sleep_quality, dose_drops')
+      .select('log_date, semaphore, energy, mood, sleep_quality, dose_drops, symptoms, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt')
       .eq('user_id', patientId)
       .order('log_date', { ascending: false })
-      .limit(14),
+      .limit(14)
+      .returns<DailyLogRow[]>(),
     supabase
       .from('exams')
       .select('id, exam_type, exam_label, exam_date, result_value, result_unit, is_within_range, ai_interpretation')
@@ -129,6 +159,43 @@ export default async function PatientPage({
     .eq('patient_id', patientId)
     .maybeSingle<{ custom_dose_suggestion: number | null; pro_notes: string | null }>()
 
+  const mappedLogs: ProPatientSignalLog[] = (logs ?? []).map((log) => ({
+    logDate: log.log_date,
+    semaphore: log.semaphore,
+    energy: log.energy,
+    mood: log.mood,
+    sleepQuality: log.sleep_quality,
+    doseDrops: log.dose_drops,
+    symptoms: log.symptoms ?? [],
+    tookSelenium: Boolean(log.took_selenium),
+    tookMagnesium: Boolean(log.took_magnesium),
+    tookVitamins: Boolean(log.took_vitamins),
+    tookVitaminC: Boolean(log.took_vitamin_c),
+    drankWater: Boolean(log.drank_water),
+    usedSalt: Boolean(log.used_salt),
+  }))
+
+  const mappedExams = (exams ?? []).map((exam) => ({
+    id: exam.id,
+    label: exam.exam_label || exam.exam_type.replace(/_/g, ' ').toUpperCase(),
+    examDate: exam.exam_date,
+    resultValue: exam.result_value,
+    resultUnit: exam.result_unit,
+    isWithinRange: exam.is_within_range,
+    aiInterpretation: exam.ai_interpretation,
+  }))
+
+  const displayName = patientRow.patient_name?.trim() || patientRow.patient_email.split('@')[0] || 'paciente'
+  const customDoseSuggestion = proPatient?.custom_dose_suggestion ?? null
+  const clinicalSummary = buildProPatientClinicalSummary({
+    patientName: displayName,
+    alertLevel: patientRow.alert_level,
+    customDoseSuggestion,
+    recommendedDoseDrops: patientRow.recommended_dose_drops,
+    logs: mappedLogs,
+    exams: mappedExams,
+  })
+
   const data: PatientDetailData = {
     professionalId: professional.id,
     patient: {
@@ -138,7 +205,7 @@ export default async function PatientPage({
       status: patientRow.status,
       alertLevel: patientRow.alert_level,
       proNotes: proPatient?.pro_notes ?? patientRow.pro_notes,
-      customDoseSuggestion: proPatient?.custom_dose_suggestion ?? null,
+      customDoseSuggestion,
       phase: patientRow.protocol_phase,
       protocolStartDate: patientRow.protocol_start_date,
       recommendedDoseDrops: patientRow.recommended_dose_drops,
@@ -149,23 +216,9 @@ export default async function PatientPage({
       lastMood: patientRow.last_mood,
       lastDoseDrops: patientRow.last_dose_drops,
     },
-    logs: (logs ?? []).map((log) => ({
-      logDate: log.log_date,
-      semaphore: log.semaphore,
-      energy: log.energy,
-      mood: log.mood,
-      sleepQuality: log.sleep_quality,
-      doseDrops: log.dose_drops,
-    })),
-    exams: (exams ?? []).map((exam) => ({
-      id: exam.id,
-      label: exam.exam_label || exam.exam_type.replace(/_/g, ' ').toUpperCase(),
-      examDate: exam.exam_date,
-      resultValue: exam.result_value,
-      resultUnit: exam.result_unit,
-      isWithinRange: exam.is_within_range,
-      aiInterpretation: exam.ai_interpretation,
-    })),
+    logs: mappedLogs,
+    exams: mappedExams,
+    clinicalSummary,
   }
 
   return <PatientView data={data} />

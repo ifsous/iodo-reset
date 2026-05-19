@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PatientDetailData } from './page'
 import type { AlertLevel, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
@@ -23,6 +23,18 @@ const SEMAPHORE_DOT: Record<SemaphoreColor, string> = {
   green: 'bg-emerald-500',
   yellow: 'bg-amber-400',
   red: 'bg-red-500',
+}
+
+const SUMMARY_TONE_CLASS = {
+  stable: 'border-emerald-100 bg-emerald-50 text-emerald-900',
+  attention: 'border-amber-100 bg-amber-50 text-amber-900',
+  urgent: 'border-red-100 bg-red-50 text-red-900',
+}
+
+const SUMMARY_DOT_CLASS = {
+  stable: 'bg-emerald-500',
+  attention: 'bg-amber-400',
+  urgent: 'bg-red-500',
 }
 
 function initials(name: string | null, email: string) {
@@ -56,11 +68,25 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
   const router = useRouter()
   const patient = data.patient
   const phase = patient.phase ? PHASE_LABELS[patient.phase] : 'Nao informado'
+  const adjustmentRef = useRef<HTMLElement | null>(null)
+  const examsRef = useRef<HTMLElement | null>(null)
+  const historyRef = useRef<HTMLElement | null>(null)
   const [notes, setNotes] = useState(patient.proNotes ?? '')
   const [customDose, setCustomDose] = useState(patient.customDoseSuggestion?.toString() ?? '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSaved, setNotesSaved] = useState(false)
+  const [copiedMessage, setCopiedMessage] = useState(false)
+
+  function scrollToSection(ref: React.RefObject<HTMLElement | null>) {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  async function copyPatientMessage() {
+    await navigator.clipboard.writeText(data.clinicalSummary.messageSuggestion)
+    setCopiedMessage(true)
+    window.setTimeout(() => setCopiedMessage(false), 2500)
+  }
 
   async function saveAdjustment() {
     setSavingNotes(true)
@@ -131,6 +157,61 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
       </div>
 
       <main className="max-w-lg mx-auto px-4 pt-4 space-y-4">
+        <Card title="Resumo clinico">
+          <div className={`rounded-lg border p-3 ${SUMMARY_TONE_CLASS[data.clinicalSummary.tone]}`}>
+            <div className="flex items-start gap-2">
+              <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${SUMMARY_DOT_CLASS[data.clinicalSummary.tone]}`} />
+              <div>
+                <p className="text-sm font-semibold">{data.clinicalSummary.title}</p>
+                <p className="text-xs leading-relaxed mt-1 opacity-80">{data.clinicalSummary.narrative}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-400">Sinal principal</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{data.clinicalSummary.primarySignal}</p>
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-gray-400">Proxima acao</p>
+              <p className="text-sm font-medium text-gray-900 mt-1">{data.clinicalSummary.nextBestAction}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Acoes rapidas">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => scrollToSection(adjustmentRef)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              Ajustar protocolo
+            </button>
+            <button
+              onClick={() => scrollToSection(historyRef)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              Ver sinais
+            </button>
+            <button
+              onClick={() => scrollToSection(examsRef)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-800 hover:bg-gray-50 transition-colors"
+            >
+              Revisar exames
+            </button>
+            <button
+              onClick={copyPatientMessage}
+              className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs font-medium text-teal-900 hover:bg-teal-100 transition-colors"
+            >
+              {copiedMessage ? 'Copiado' : 'Copiar aviso'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed mt-3">
+            Mensagem sugerida: {data.clinicalSummary.messageSuggestion}
+          </p>
+        </Card>
+
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-lg border border-gray-200/70 p-3 shadow-sm">
             <p className="text-xs text-gray-500">Fase</p>
@@ -145,6 +226,57 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             <p className="text-sm font-semibold text-gray-950 mt-1">{patient.protocolDay ?? '-'}</p>
           </div>
         </div>
+
+        <Card title="Sinais de acompanhamento">
+          <div className="grid grid-cols-4 gap-2">
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Verdes</p>
+              <p className="text-sm font-semibold text-emerald-700">{data.clinicalSummary.metrics.greenDays}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Amarelos</p>
+              <p className="text-sm font-semibold text-amber-700">{data.clinicalSummary.metrics.yellowDays}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Vermelhos</p>
+              <p className="text-sm font-semibold text-red-700">{data.clinicalSummary.metrics.redDays}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Sem check-in</p>
+              <p className="text-sm font-semibold text-gray-900">{data.clinicalSummary.metrics.daysWithoutLog ?? '-'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 mt-2">
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Energia</p>
+              <p className="text-sm font-semibold text-gray-900">{data.clinicalSummary.metrics.averageEnergy ?? '-'}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Humor</p>
+              <p className="text-sm font-semibold text-gray-900">{data.clinicalSummary.metrics.averageMood ?? '-'}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Sono</p>
+              <p className="text-sm font-semibold text-gray-900">{data.clinicalSummary.metrics.averageSleep ?? '-'}</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
+              <p className="text-[11px] text-gray-400">Cofatores</p>
+              <p className="text-sm font-semibold text-gray-900">
+                {data.clinicalSummary.metrics.cofactorAdherencePct !== null ? `${data.clinicalSummary.metrics.cofactorAdherencePct}%` : '-'}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 mt-3">
+            {data.clinicalSummary.flags.map((flag) => (
+              <div key={`${flag.label}-${flag.detail}`} className={`rounded-lg border p-2.5 ${SUMMARY_TONE_CLASS[flag.tone]}`}>
+                <p className="text-xs font-semibold">{flag.label}</p>
+                <p className="text-xs leading-relaxed opacity-80 mt-0.5">{flag.detail}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
 
         <Card title="Ultimo registro">
           <div className="flex items-center justify-between">
@@ -172,17 +304,26 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
           </div>
         </Card>
 
+        <section ref={historyRef}>
         <Card title="Evolucao recente">
           {data.logs.length > 0 ? (
             <div className="space-y-2">
               {data.logs.slice(0, 7).map((log) => (
-                <div key={log.logDate} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-16">{formatDate(log.logDate).replace(' de ', ' ')}</span>
-                  <span className={`w-2.5 h-2.5 rounded-full ${SEMAPHORE_DOT[log.semaphore]}`} />
-                  <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-teal-500" style={{ width: `${((log.energy ?? 0) / 10) * 100}%` }} />
+                <div key={log.logDate} className="rounded-lg border border-gray-100 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-16">{formatDate(log.logDate).replace(' de ', ' ')}</span>
+                    <span className={`w-2.5 h-2.5 rounded-full ${SEMAPHORE_DOT[log.semaphore]}`} />
+                    <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                      <div className="h-full rounded-full bg-teal-500" style={{ width: `${((log.energy ?? 0) / 10) * 100}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-500 w-5 text-right">{log.energy ?? '-'}</span>
                   </div>
-                  <span className="text-xs text-gray-500 w-5 text-right">{log.energy ?? '-'}</span>
+                  <div className="grid grid-cols-4 gap-2 mt-2 text-[11px] text-gray-500">
+                    <span>Humor {log.mood ?? '-'}</span>
+                    <span>Sono {log.sleepQuality ?? '-'}</span>
+                    <span>Dose {log.doseDrops}</span>
+                    <span>{log.symptoms.length > 0 && !log.symptoms.includes('none') ? `${log.symptoms.length} sintomas` : 'Sem sintomas'}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -190,7 +331,9 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             <p className="text-sm text-gray-400">Nenhum registro diario encontrado.</p>
           )}
         </Card>
+        </section>
 
+        <section ref={examsRef}>
         <Card title="Exames recentes">
           {data.exams.length > 0 ? (
             <div className="space-y-2">
@@ -217,7 +360,9 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             <p className="text-sm text-gray-400">Nenhum exame cadastrado.</p>
           )}
         </Card>
+        </section>
 
+        <section ref={adjustmentRef}>
         <Card title="Ajuste profissional">
           <div className="grid grid-cols-[1fr_auto] gap-3 mb-3">
             <div>
@@ -275,6 +420,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">Ajuste salvo.</p>
           )}
         </Card>
+        </section>
       </main>
     </div>
   )
