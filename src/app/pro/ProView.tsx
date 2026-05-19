@@ -7,6 +7,7 @@ import type { ProTriageLevel } from '@/lib/pro-triage'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
 type ProfessionalProfile = NonNullable<ProData['professional']>
+type QueueFilter = 'all' | 'priority' | 'pending_return' | 'stale'
 
 const PHASE_LABELS: Record<ProtocolPhase, string> = {
   '0': 'Pre-protocolo',
@@ -307,7 +308,8 @@ function PatientCard({ patient }: { patient: ProPatientSummary }) {
                 </span>
               </div>
               <p className="text-xs text-amber-800/80 leading-relaxed mt-0.5">
-                Paciente ainda nao registrou diario depois da ultima orientacao.
+                Paciente ainda nao registrou diario depois da ultima orientacao
+                {patient.guidanceDaysPending !== null ? ` ha ${patient.guidanceDaysPending} dia${patient.guidanceDaysPending === 1 ? '' : 's'}.` : '.'}
               </p>
             </div>
           )}
@@ -320,6 +322,96 @@ function PatientCard({ patient }: { patient: ProPatientSummary }) {
         </div>
       </div>
     </button>
+  )
+}
+
+function QueueFilterBar({
+  filter,
+  onChange,
+  search,
+  onSearchChange,
+  patients,
+}: {
+  filter: QueueFilter
+  onChange: (filter: QueueFilter) => void
+  search: string
+  onSearchChange: (value: string) => void
+  patients: ProPatientSummary[]
+}) {
+  const options: Array<{ key: QueueFilter; label: string; count: number }> = [
+    { key: 'all', label: 'Todos', count: patients.length },
+    { key: 'priority', label: 'Prioridade', count: patients.filter((patient) => patient.triage.level === 'urgent' || patient.triage.level === 'attention').length },
+    { key: 'pending_return', label: 'Sem retorno', count: patients.filter((patient) => patient.guidancePending).length },
+    { key: 'stale', label: 'Sem check-in', count: patients.filter((patient) => (patient.triage.daysWithoutLog ?? 0) >= 3).length },
+  ]
+
+  return (
+    <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <input
+        value={search}
+        onChange={(event) => onSearchChange(event.target.value)}
+        placeholder="Buscar paciente ou e-mail"
+        className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+      />
+      <div className="grid grid-cols-4 gap-2">
+        {options.map((option) => {
+          const active = filter === option.key
+          return (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => onChange(option.key)}
+              className={`rounded-lg border px-2 py-2 text-center transition-colors ${
+                active
+                  ? 'border-teal-200 bg-teal-50 text-teal-900'
+                  : 'border-gray-100 bg-slate-50 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <span className="block text-xs font-medium">{option.label}</span>
+              <span className="block text-[11px] opacity-70 mt-0.5">{option.count}</span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function DailyActionCard({ patients }: { patients: ProPatientSummary[] }) {
+  const router = useRouter()
+  const actionPatients = patients
+    .filter((patient) => patient.guidancePending || patient.triage.level === 'urgent' || patient.triage.level === 'attention')
+    .slice(0, 3)
+
+  if (actionPatients.length === 0) return null
+
+  return (
+    <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-900">Acoes do dia</h2>
+        <p className="text-xs text-gray-500 mt-1">Pacientes para abrir primeiro antes de novos ajustes.</p>
+      </div>
+      <div className="space-y-2">
+        {actionPatients.map((patient) => (
+          <button
+            key={patient.patientId}
+            type="button"
+            onClick={() => router.push(`/pro/${patient.patientId}`)}
+            className="w-full rounded-lg border border-gray-100 bg-slate-50 p-3 text-left hover:bg-gray-100 transition-colors"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{displayName(patient.patientName, patient.patientEmail)}</p>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{patient.triage.nextAction}</p>
+              </div>
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${TRIAGE_CONFIG[patient.triage.level].badge}`}>
+                {patient.guidancePending ? 'Sem retorno' : patient.triage.label}
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -679,6 +771,8 @@ export default function ProView({ data }: { data: ProData }) {
   const router = useRouter()
   const [professional, setProfessional] = useState(data.professional)
   const [invites, setInvites] = useState(data.invites)
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all')
+  const [patientSearch, setPatientSearch] = useState('')
   const activePatients = data.patients.filter((patient) => patient.status === 'active').length
   const urgentPatients = data.patients.filter((patient) => patient.alertLevel === 'urgent').length
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
@@ -689,6 +783,25 @@ export default function ProView({ data }: { data: ProData }) {
   const slotsUsed = professional
     ? `${data.patients.length + invites.filter((invite) => invite.status === 'pending' && !invite.patientId).length}/${professional.patientLimit}`
     : '0/0'
+  const normalizedSearch = patientSearch.trim().toLowerCase()
+  const visiblePatients = data.patients.filter((patient) => {
+    const matchesFilter = queueFilter === 'all'
+      ? true
+      : queueFilter === 'priority'
+        ? patient.triage.level === 'urgent' || patient.triage.level === 'attention'
+        : queueFilter === 'pending_return'
+          ? patient.guidancePending
+          : (patient.triage.daysWithoutLog ?? 0) >= 3
+
+    if (!matchesFilter) return false
+    if (!normalizedSearch) return true
+
+    return [
+      patient.patientName,
+      patient.patientEmail,
+      patient.proNotes,
+    ].some((value) => value?.toLowerCase().includes(normalizedSearch))
+  })
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] pb-24">
@@ -732,6 +845,8 @@ export default function ProView({ data }: { data: ProData }) {
 
         <ClinicalQueueSummary patients={data.patients} />
 
+        <DailyActionCard patients={data.patients} />
+
         <ProfessionalProfileCard
           professional={professional}
           onSaved={setProfessional}
@@ -740,6 +855,14 @@ export default function ProView({ data }: { data: ProData }) {
         <InviteManagementCard
           invites={invites}
           onInvitesChange={setInvites}
+        />
+
+        <QueueFilterBar
+          filter={queueFilter}
+          onChange={setQueueFilter}
+          search={patientSearch}
+          onSearchChange={setPatientSearch}
+          patients={data.patients}
         />
 
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
@@ -767,11 +890,26 @@ export default function ProView({ data }: { data: ProData }) {
           </div>
         </section>
 
-        {data.patients.length > 0 ? (
+        {visiblePatients.length > 0 ? (
           <div className="space-y-3">
-            {data.patients.map((patient) => (
+            {visiblePatients.map((patient) => (
               <PatientCard key={patient.patientId} patient={patient} />
             ))}
+          </div>
+        ) : data.patients.length > 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200/70 p-6 shadow-sm text-center">
+            <p className="text-sm font-semibold text-gray-900">Nenhum paciente neste filtro</p>
+            <p className="text-xs text-gray-500 leading-relaxed mt-1">Ajuste a busca ou volte para todos os pacientes.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setQueueFilter('all')
+                setPatientSearch('')
+              }}
+              className="mt-4 w-full py-2.5 rounded-lg border border-teal-200 text-teal-800 text-sm font-medium hover:bg-teal-50"
+            >
+              Limpar filtros
+            </button>
           </div>
         ) : (
           <EmptyState hasProfessionalProfile={Boolean(professional)} />

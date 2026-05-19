@@ -30,6 +30,7 @@ export interface ProPatientSummary {
   lastDoseDrops: number | null
   guidanceUpdatedAt: string | null
   guidancePending: boolean
+  guidanceDaysPending: number | null
   triage: ProTriage
 }
 
@@ -160,6 +161,13 @@ function hasRespondedAfterGuidance(lastLogDate: string | null, guidanceUpdatedAt
   return new Date(`${lastLogDate}T23:59:59`).getTime() >= new Date(guidanceUpdatedAt).getTime()
 }
 
+function daysSinceDateTime(date: string | null) {
+  if (!date) return null
+
+  const diff = Date.now() - new Date(date).getTime()
+  return Math.max(0, Math.floor(diff / 86_400_000))
+}
+
 export default async function ProPage() {
   const supabase = await createClient()
 
@@ -234,6 +242,7 @@ export default async function ProPage() {
           guidanceUpdatedAt &&
           !hasRespondedAfterGuidance(row.last_log_date, guidanceUpdatedAt)
         )
+        const guidanceDaysPending = guidancePending ? daysSinceDateTime(guidanceUpdatedAt) : null
         const triage = buildProTriage({
           status: row.status,
           alertLevel: row.alert_level,
@@ -243,6 +252,7 @@ export default async function ProPage() {
           lastMood: row.last_mood,
           proNotes,
           guidancePending,
+          guidanceDaysPending,
         })
 
         return {
@@ -263,6 +273,7 @@ export default async function ProPage() {
           lastDoseDrops: row.last_dose_drops,
           guidanceUpdatedAt,
           guidancePending,
+          guidanceDaysPending,
           triage,
         }
       })

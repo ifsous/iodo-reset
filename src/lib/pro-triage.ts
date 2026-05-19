@@ -11,6 +11,7 @@ export interface ProTriageInput {
   lastMood: number | null
   proNotes: string | null
   guidancePending?: boolean
+  guidanceDaysPending?: number | null
 }
 
 export interface ProTriage {
@@ -77,8 +78,9 @@ export function buildProTriage(input: ProTriageInput): ProTriage {
   }
 
   if (input.guidancePending) {
-    score += 30
-    reasons.push('orientacao sem retorno')
+    const pendingDays = input.guidanceDaysPending ?? 0
+    score += pendingDays >= 2 ? 45 : 30
+    reasons.push(pendingDays >= 1 ? `orientacao sem retorno ha ${pendingDays} dia${pendingDays === 1 ? '' : 's'}` : 'orientacao sem retorno')
   }
 
   if (score >= 90) {
