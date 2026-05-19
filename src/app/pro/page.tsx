@@ -4,6 +4,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { buildProTriage, type ProTriage } from '@/lib/pro-triage'
 import ProView from './ProView'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
@@ -27,6 +28,7 @@ export interface ProPatientSummary {
   lastEnergy: number | null
   lastMood: number | null
   lastDoseDrops: number | null
+  triage: ProTriage
 }
 
 export interface ProData {
@@ -111,9 +113,8 @@ type DashboardRow = {
 }
 
 function sortPatients(a: ProPatientSummary, b: ProPatientSummary) {
-  const alertRank: Record<AlertLevel, number> = { urgent: 0, attention: 1, ok: 2 }
-  const alertDiff = alertRank[a.alertLevel] - alertRank[b.alertLevel]
-  if (alertDiff !== 0) return alertDiff
+  const scoreDiff = b.triage.score - a.triage.score
+  if (scoreDiff !== 0) return scoreDiff
 
   const aDate = a.lastLogDate ?? ''
   const bDate = b.lastLogDate ?? ''
@@ -168,23 +169,36 @@ export default async function ProPage() {
       .eq('professional_id', professional.id)
 
     patients = ((rows ?? []) as DashboardRow[])
-      .map((row) => ({
-        patientId: row.patient_id,
-        status: row.status,
-        alertLevel: row.alert_level,
-        proNotes: row.pro_notes,
-        patientName: row.patient_name,
-        patientEmail: row.patient_email,
-        protocolPhase: row.protocol_phase,
-        protocolStartDate: row.protocol_start_date,
-        recommendedDoseDrops: row.recommended_dose_drops,
-        protocolDay: row.protocol_day,
-        lastLogDate: row.last_log_date,
-        lastSemaphore: row.last_semaphore,
-        lastEnergy: row.last_energy,
-        lastMood: row.last_mood,
-        lastDoseDrops: row.last_dose_drops,
-      }))
+      .map((row) => {
+        const triage = buildProTriage({
+          status: row.status,
+          alertLevel: row.alert_level,
+          lastLogDate: row.last_log_date,
+          lastSemaphore: row.last_semaphore,
+          lastEnergy: row.last_energy,
+          lastMood: row.last_mood,
+          proNotes: row.pro_notes,
+        })
+
+        return {
+          patientId: row.patient_id,
+          status: row.status,
+          alertLevel: row.alert_level,
+          proNotes: row.pro_notes,
+          patientName: row.patient_name,
+          patientEmail: row.patient_email,
+          protocolPhase: row.protocol_phase,
+          protocolStartDate: row.protocol_start_date,
+          recommendedDoseDrops: row.recommended_dose_drops,
+          protocolDay: row.protocol_day,
+          lastLogDate: row.last_log_date,
+          lastSemaphore: row.last_semaphore,
+          lastEnergy: row.last_energy,
+          lastMood: row.last_mood,
+          lastDoseDrops: row.last_dose_drops,
+          triage,
+        }
+      })
       .sort(sortPatients)
   }
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import type { ProData, ProPatientSummary } from './page'
+import type { ProTriageLevel } from '@/lib/pro-triage'
 import type { AlertLevel, PlanType, ProtocolPhase, SemaphoreColor } from '@/lib/supabase/types'
 
 type ProfessionalProfile = NonNullable<ProData['professional']>
@@ -43,6 +44,29 @@ const SEMAPHORE_CONFIG: Record<SemaphoreColor, { label: string; dot: string; tex
   green: { label: 'verde', dot: 'bg-emerald-500', text: 'text-emerald-700' },
   yellow: { label: 'amarelo', dot: 'bg-amber-400', text: 'text-amber-700' },
   red: { label: 'vermelho', dot: 'bg-red-500', text: 'text-red-700' },
+}
+
+const TRIAGE_CONFIG: Record<ProTriageLevel, { badge: string; border: string; dot: string }> = {
+  urgent: {
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    border: 'border-red-200',
+    dot: 'bg-red-500',
+  },
+  attention: {
+    badge: 'bg-amber-50 text-amber-800 border-amber-100',
+    border: 'border-amber-200',
+    dot: 'bg-amber-400',
+  },
+  follow_up: {
+    badge: 'bg-sky-50 text-sky-800 border-sky-100',
+    border: 'border-sky-200',
+    dot: 'bg-sky-500',
+  },
+  stable: {
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+    border: 'border-gray-200/70',
+    dot: 'bg-emerald-500',
+  },
 }
 
 function initials(name: string | null, email: string) {
@@ -140,16 +164,46 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   )
 }
 
+function ClinicalQueueSummary({ patients }: { patients: ProPatientSummary[] }) {
+  const urgent = patients.filter((patient) => patient.triage.level === 'urgent').length
+  const attention = patients.filter((patient) => patient.triage.level === 'attention').length
+  const followUp = patients.filter((patient) => patient.triage.level === 'follow_up').length
+  const stale = patients.filter((patient) => (patient.triage.daysWithoutLog ?? 0) >= 3).length
+
+  return (
+    <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-900">Prioridade de hoje</h2>
+        <p className="text-xs text-gray-500 mt-1">Fila ordenada por risco, sinal recente e falta de check-in.</p>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          ['Alta', urgent, 'text-red-700'],
+          ['Atencao', attention, 'text-amber-700'],
+          ['Follow-up', followUp, 'text-sky-700'],
+          ['Sem check-in', stale, 'text-gray-700'],
+        ].map(([label, value, color]) => (
+          <div key={label} className="rounded-lg bg-slate-50 border border-gray-100 p-2 text-center">
+            <p className={`text-xl font-semibold ${color}`}>{value}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function PatientCard({ patient }: { patient: ProPatientSummary }) {
   const router = useRouter()
   const alert = ALERT_CONFIG[patient.alertLevel]
   const semaphore = patient.lastSemaphore ? SEMAPHORE_CONFIG[patient.lastSemaphore] : null
   const phase = patient.protocolPhase ? PHASE_LABELS[patient.protocolPhase] : 'Sem fase'
+  const triage = TRIAGE_CONFIG[patient.triage.level]
 
   return (
     <button
       onClick={() => router.push(`/pro/${patient.patientId}`)}
-      className="w-full text-left bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm hover:border-teal-200 hover:shadow-md transition-all"
+      className={`w-full text-left bg-white rounded-lg border ${triage.border} p-4 shadow-sm hover:border-teal-200 hover:shadow-md transition-all`}
     >
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 rounded-full bg-teal-50 text-teal-800 flex items-center justify-center text-sm font-semibold flex-shrink-0">
@@ -163,9 +217,14 @@ function PatientCard({ patient }: { patient: ProPatientSummary }) {
               </p>
               <p className="text-xs text-gray-400 truncate">{patient.patientEmail}</p>
             </div>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${alert.badge}`}>
-              {alert.label}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${triage.badge}`}>
+                {patient.triage.label}
+              </span>
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${alert.badge}`}>
+                {alert.label}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-3">
@@ -189,12 +248,17 @@ function PatientCard({ patient }: { patient: ProPatientSummary }) {
 
           <div className="flex items-center justify-between mt-3">
             <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${semaphore?.dot ?? 'bg-gray-300'}`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${semaphore?.dot ?? triage.dot}`} />
               <span className={`text-xs ${semaphore?.text ?? 'text-gray-400'}`}>
                 {semaphore ? `Semaforo ${semaphore.label}` : 'Sem registro recente'}
               </span>
             </div>
             <span className="text-xs text-gray-400">{formatDate(patient.lastLogDate)}</span>
+          </div>
+
+          <div className="mt-3 rounded-lg bg-slate-50 border border-gray-100 p-2">
+            <p className="text-xs font-medium text-gray-800">{patient.triage.reason}</p>
+            <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{patient.triage.nextAction}</p>
           </div>
 
           {patient.proNotes && (
@@ -448,6 +512,7 @@ export default function ProView({ data }: { data: ProData }) {
   const urgentPatients = data.patients.filter((patient) => patient.alertLevel === 'urgent').length
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
   const redToday = data.patients.filter((patient) => patient.lastSemaphore === 'red').length
+  const highPriorityPatients = data.patients.filter((patient) => patient.triage.level === 'urgent').length
   const displayProfessionalName = professional?.displayName || data.user.fullName || 'Profissional'
   const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
   const slotsUsed = professional
@@ -491,8 +556,10 @@ export default function ProView({ data }: { data: ProData }) {
       <main className="max-w-lg mx-auto px-4 pt-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Capacidade" value={slotsUsed} sub="pacientes vinculados" />
-          <StatCard label="Semaforo vermelho" value={redToday} sub="ultimo registro" />
+          <StatCard label="Prioridade alta" value={highPriorityPatients} sub={`${redToday} com semaforo vermelho`} />
         </div>
+
+        <ClinicalQueueSummary patients={data.patients} />
 
         <ProfessionalProfileCard
           professional={professional}
