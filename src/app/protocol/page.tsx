@@ -40,6 +40,96 @@ const STRATEGY_LABELS: Record<ProgressionStrategy, string> = {
   supervised: 'Supervisionado',
 }
 
+const EDUCATIONAL_PHASES: Array<{
+  phase: ProtocolPhase
+  label: string
+  purpose: string
+  focus: string[]
+  avoid: string[]
+  progress: string
+}> = [
+  {
+    phase: '0',
+    label: 'Pre-protocolo - Base e tolerancia',
+    purpose: 'Preparar o corpo antes de usar iodo ou antes de qualquer aumento. Esta fase reduz improviso e organiza cofatores, sintomas e exames.',
+    focus: [
+      'Completar cofatores centrais, especialmente selenio e magnesio, conforme tolerancia individual.',
+      'Registrar energia, sono, humor, sintomas, agua, sal e suplementos por alguns dias.',
+      'Revisar historico tireoidiano, medicamentos, gravidez, amamentacao e sinais de risco.',
+    ],
+    avoid: [
+      'Iniciar dose alta sem saber como estao sintomas, cofatores e exames.',
+      'Usar iodo para compensar cansaço, ansiedade ou ganho de peso sem avaliacao.',
+      'Ignorar palpitacoes, tremor, piora importante de ansiedade ou pressao alta.',
+    ],
+    progress: 'Avance apenas quando a base estiver consistente e o semaforo estiver estavel.',
+  },
+  {
+    phase: '1',
+    label: 'Fase 1 - Ativacao',
+    purpose: 'Introduzir ou manter uma dose baixa com foco em observar resposta. O objetivo nao e acelerar, e entender tolerancia.',
+    focus: [
+      'Manter registro diario e conferir se o semaforo permanece verde.',
+      'Priorizar hidratacao, sal conforme tolerancia e cofatores todos os dias.',
+      'Observar pele, intestino, sono, energia, humor e sinais cardiovasculares.',
+    ],
+    avoid: [
+      'Aumentar dose em dias de sono ruim, estresse intenso ou sintomas novos.',
+      'Confundir reacao intensa com sinal de que precisa subir mais rapido.',
+      'Usar algas ou kelp em paralelo sem saber o teor de iodo.',
+    ],
+    progress: 'Considere progressao somente com boa tolerancia, cofatores consistentes e ausencia de sinais de alerta.',
+  },
+  {
+    phase: '2',
+    label: 'Fase 2 - Progressao',
+    purpose: 'Ajustar gradualmente quando a resposta esta previsivel. A fase depende mais de estabilidade do que de calendario.',
+    focus: [
+      'Comparar tendencia semanal de energia, sono, humor e sintomas.',
+      'Usar exames e historico para decidir se faz sentido manter, pausar ou ajustar.',
+      'Evitar multiplas mudancas ao mesmo tempo para conseguir entender causa e efeito.',
+    ],
+    avoid: [
+      'Subir dose em semaforo amarelo ou vermelho.',
+      'Mudar iodo, cofatores, dieta e treino no mesmo dia e perder rastreabilidade.',
+      'Seguir progressao padrao se o perfil foi marcado como conservador ou supervisionado.',
+    ],
+    progress: 'A dose so deve subir quando a tendencia recente confirma tolerancia.',
+  },
+  {
+    phase: '3',
+    label: 'Fase 3 - Detox e acompanhamento proximo',
+    purpose: 'Fase de maior atencao a sintomas e carga de halogenios. No app, detox significa monitorar tolerancia, nao forcar reacoes.',
+    focus: [
+      'Acompanhar sintomas com mais rigor e reduzir carga desnecessaria de competidores do iodo.',
+      'Reforcar agua, sal conforme tolerancia, vitamina C e cofatores combinados.',
+      'Usar profissional de referencia quando houver Hashimoto, Graves, nodulos, medicacao tireoidiana ou sintomas fortes.',
+    ],
+    avoid: [
+      'Interpretar piora intensa como etapa obrigatoria.',
+      'Insistir em dose quando aparecem palpitacoes, ansiedade forte, tremor ou piora importante.',
+      'Fazer protocolos paralelos agressivos sem monitoramento.',
+    ],
+    progress: 'Esta fase pede manutencao ou reducao sempre que a resposta ficar instavel.',
+  },
+  {
+    phase: '4',
+    label: 'Fase 4 - Estabilizacao',
+    purpose: 'Manter ganhos, simplificar rotina e revisar necessidade real de continuidade. O foco passa a ser sustentacao.',
+    focus: [
+      'Revisar exames, sintomas e rotina para decidir manutencao.',
+      'Manter cofatores essenciais e reduzir complexidade quando possivel.',
+      'Usar dados do historico para evitar retorno automatico a dose maior.',
+    ],
+    avoid: [
+      'Manter dose alta por habito sem revisar sinais e exames.',
+      'Parar todos os cofatores ao mesmo tempo se eles sustentaram tolerancia.',
+      'Ignorar mudancas de contexto como gravidez, novos medicamentos ou sintomas tireoidianos.',
+    ],
+    progress: 'A estabilidade deve ser reavaliada periodicamente, especialmente se surgirem sintomas novos.',
+  },
+]
+
 type ExamScheduleItem = {
   key?: string
   label?: string
@@ -104,6 +194,42 @@ function BulletList({ items }: { items: string[] }) {
         </div>
       ))}
     </div>
+  )
+}
+
+function PhaseEducationCard({
+  item,
+  current,
+}: {
+  item: (typeof EDUCATIONAL_PHASES)[number]
+  current: boolean
+}) {
+  return (
+    <article className={`rounded-lg border p-4 space-y-3 ${current ? 'bg-teal-50 border-teal-100' : 'bg-slate-50 border-gray-100'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Fase {item.phase}</p>
+          <h3 className="text-sm font-semibold text-gray-950 leading-tight">{item.label}</h3>
+        </div>
+        {current && (
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full border bg-white text-teal-800 border-teal-100 whitespace-nowrap">
+            Atual
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-700 leading-relaxed">{item.purpose}</p>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Foco</p>
+        <BulletList items={item.focus} />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Evitar</p>
+        <BulletList items={item.avoid} />
+      </div>
+      <div className="rounded-lg bg-white/80 border border-gray-100 px-3 py-2">
+        <p className="text-xs text-gray-700 leading-relaxed">{item.progress}</p>
+      </div>
+    </article>
   )
 }
 
@@ -238,6 +364,17 @@ export default async function ProtocolPage() {
           </div>
         </Section>
 
+        <Section title="Fases do protocolo">
+          <div className="space-y-3">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              As fases ajudam a organizar decisao e observacao. Elas nao sao uma corrida: sinais recentes, exames, cofatores e risco individual sempre pesam mais que calendario.
+            </p>
+            {EDUCATIONAL_PHASES.map((item) => (
+              <PhaseEducationCard key={item.phase} item={item} current={item.phase === profile.phase} />
+            ))}
+          </div>
+        </Section>
+
         <Section title="Base antes de progressao">
           <BulletList
             items={[
@@ -253,6 +390,18 @@ export default async function ProtocolPage() {
               </p>
             </div>
           )}
+        </Section>
+
+        <Section title="O que evitar durante o protocolo">
+          <BulletList
+            items={[
+              'Aumentar dose quando houver palpitacoes, tremor, ansiedade forte, pressao elevada, insonia marcante ou semaforo vermelho.',
+              'Combinar varias fontes de iodo sem rastrear quantidade total, especialmente kelp, algas, Lugol e multivitaminicos.',
+              'Usar doses acima de limites nutricionais como rotina sem profissional e sem monitoramento laboratorial.',
+              'Ignorar medicamentos tireoidianos, antitireoidianos, amiodarona, litio ou historico de hipertireoidismo.',
+              'Tratar o app como diagnostico. O app organiza dados e educacao; decisao clinica sensivel precisa de profissional.',
+            ]}
+          />
         </Section>
 
         <Section title="Orientacao alimentar">
@@ -297,6 +446,32 @@ export default async function ProtocolPage() {
               </p>
             </div>
           )}
+        </Section>
+
+        <Section title="Referencias de seguranca">
+          <div className="space-y-3">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              O iodo e essencial para hormonios tireoidianos, mas excesso ou uso sem contexto pode piorar quadros tireoidianos em pessoas suscetiveis. Por isso o app separa educacao, registro e acompanhamento profissional.
+            </p>
+            <div className="space-y-2">
+              <a
+                href="https://ods.od.nih.gov/factsheets/Iodine-HealthProfessional/"
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-lg border border-gray-100 bg-slate-50 px-3 py-2 text-sm text-teal-800 font-medium hover:bg-teal-50"
+              >
+                NIH ODS - Iodine Fact Sheet
+              </a>
+              <a
+                href="https://www.thyroid.org/ata-statement-on-the-potential-risks-of-excess-iodine-ingestion-and-exposure/"
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-lg border border-gray-100 bg-slate-50 px-3 py-2 text-sm text-teal-800 font-medium hover:bg-teal-50"
+              >
+                American Thyroid Association - riscos de excesso de iodo
+              </a>
+            </div>
+          </div>
         </Section>
 
         <Section title="Monitoramento laboratorial">
