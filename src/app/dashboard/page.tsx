@@ -41,6 +41,7 @@ export interface DashboardData {
     customDoseSuggestion: number | null
     proNotes: string | null
     professionalName: string | null
+    updatedAt: string | null
   } | null
   lastLog: {
     id:           string
@@ -151,7 +152,7 @@ export default async function DashboardPage() {
 
   const { data: professionalLink } = await supabase
     .from('pro_patients')
-    .select('professional_id, custom_dose_suggestion, pro_notes')
+    .select('professional_id, custom_dose_suggestion, pro_notes, updated_at')
     .eq('patient_id', user.id)
     .eq('status', 'active')
     .order('updated_at', { ascending: false })
@@ -160,6 +161,7 @@ export default async function DashboardPage() {
       professional_id: string
       custom_dose_suggestion: number | null
       pro_notes: string | null
+      updated_at: string | null
     }>()
 
   const { data: professionalAdjustmentSource } = professionalLink
@@ -180,6 +182,7 @@ export default async function DashboardPage() {
         customDoseSuggestion: professionalLink.custom_dose_suggestion,
         proNotes: professionalLink.pro_notes,
         professionalName: professionalAdjustmentSource?.display_name ?? null,
+        updatedAt: professionalLink.updated_at,
       }
     : null
 

@@ -329,6 +329,7 @@ export interface Database {
           alert_level?: AlertLevel
           invite_sent_at?: string | null
           invite_accepted_at?: string | null
+          updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['pro_patients']['Insert']>
         Relationships: []

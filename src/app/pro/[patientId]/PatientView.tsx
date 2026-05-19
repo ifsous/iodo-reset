@@ -55,6 +55,16 @@ function formatDate(date: string | null) {
   })
 }
 
+function formatDateTime(date: string | null) {
+  if (!date) return 'Sem orientacao'
+
+  return new Date(date).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
@@ -68,6 +78,12 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
   const router = useRouter()
   const patient = data.patient
   const phase = patient.phase ? PHASE_LABELS[patient.phase] : 'Nao informado'
+  const hasGuidance = Boolean(patient.proNotes?.trim())
+  const respondedAfterGuidance = Boolean(
+    patient.guidanceUpdatedAt &&
+    patient.lastLogDate &&
+    new Date(patient.lastLogDate + 'T23:59:59').getTime() >= new Date(patient.guidanceUpdatedAt).getTime()
+  )
   const adjustmentRef = useRef<HTMLElement | null>(null)
   const examsRef = useRef<HTMLElement | null>(null)
   const historyRef = useRef<HTMLElement | null>(null)
@@ -109,6 +125,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
       error?: string
       custom_dose_suggestion?: number | null
       pro_notes?: string | null
+      guidance_updated_at?: string | null
     }
     setSendingGuidance(false)
 
@@ -264,6 +281,37 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
             </p>
           )}
         </Card>
+
+        {hasGuidance && (
+          <Card title="Retorno da orientacao">
+            <div className={`rounded-lg border p-3 ${
+              respondedAfterGuidance
+                ? 'bg-emerald-50 border-emerald-100 text-emerald-900'
+                : 'bg-amber-50 border-amber-100 text-amber-900'
+            }`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {respondedAfterGuidance ? 'Paciente ja registrou retorno' : 'Aguardando check-in do paciente'}
+                  </p>
+                  <p className="text-xs leading-relaxed mt-1 opacity-80">
+                    Ultima orientacao: {formatDateTime(patient.guidanceUpdatedAt)}. Ultimo diario: {formatDate(patient.lastLogDate)}.
+                  </p>
+                </div>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${
+                  respondedAfterGuidance
+                    ? 'bg-emerald-100 border-emerald-200 text-emerald-800'
+                    : 'bg-amber-100 border-amber-200 text-amber-800'
+                }`}>
+                  {respondedAfterGuidance ? 'Respondido' : 'Pendente'}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed mt-3">
+              Use este status para saber se vale revisar o diario antes de novo ajuste ou reenviar uma orientacao mais simples.
+            </p>
+          </Card>
+        )}
 
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-lg border border-gray-200/70 p-3 shadow-sm">

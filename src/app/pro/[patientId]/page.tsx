@@ -34,6 +34,7 @@ export interface PatientDetailData {
     lastEnergy: number | null
     lastMood: number | null
     lastDoseDrops: number | null
+    guidanceUpdatedAt: string | null
   }
   logs: {
     logDate: string
@@ -154,10 +155,10 @@ export default async function PatientPage({
 
   const { data: proPatient } = await supabase
     .from('pro_patients')
-    .select('custom_dose_suggestion, pro_notes')
+    .select('custom_dose_suggestion, pro_notes, updated_at')
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
-    .maybeSingle<{ custom_dose_suggestion: number | null; pro_notes: string | null }>()
+    .maybeSingle<{ custom_dose_suggestion: number | null; pro_notes: string | null; updated_at: string | null }>()
 
   const mappedLogs: ProPatientSignalLog[] = (logs ?? []).map((log) => ({
     logDate: log.log_date,
@@ -215,6 +216,7 @@ export default async function PatientPage({
       lastEnergy: patientRow.last_energy,
       lastMood: patientRow.last_mood,
       lastDoseDrops: patientRow.last_dose_drops,
+      guidanceUpdatedAt: proPatient?.updated_at ?? null,
     },
     logs: mappedLogs,
     exams: mappedExams,

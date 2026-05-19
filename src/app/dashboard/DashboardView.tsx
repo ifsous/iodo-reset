@@ -657,6 +657,7 @@ function DoseExplanationCard({ data }: { data: DashboardData['patientInsights'][
 function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData['professionalAdjustment']> }) {
   const professionalName = data.professionalName ?? 'Seu profissional'
   const hasDoseSuggestion = data.customDoseSuggestion !== null && data.customDoseSuggestion !== undefined
+  const router = useRouter()
 
   return (
     <div className="bg-white rounded-lg border border-teal-100 p-4 shadow-sm space-y-3">
@@ -680,11 +681,23 @@ function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData[
       {data.proNotes && (
         <p className="text-sm text-gray-700 leading-relaxed">{data.proNotes}</p>
       )}
+      {data.updatedAt && (
+        <p className="text-xs text-gray-500">
+          Recebido em {new Date(data.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+        </p>
+      )}
       <p className="text-xs text-gray-500 leading-relaxed">
         {hasDoseSuggestion
           ? 'Este ajuste orienta o Plano de Hoje, exceto quando houver alerta de seguranca como semaforo vermelho ou palpitacoes.'
           : 'Esta orientacao fica registrada no seu acompanhamento e pode ser atualizada pelo profissional.'}
       </p>
+      <button
+        type="button"
+        onClick={() => router.push('/diary')}
+        className="w-full rounded-lg border border-teal-200 text-teal-800 text-sm font-medium py-3 hover:bg-teal-50 transition-colors"
+      >
+        Registrar check-in sobre esta orientacao
+      </button>
     </div>
   )
 }

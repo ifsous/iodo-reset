@@ -70,8 +70,10 @@ export async function PATCH(request: Request) {
   const updatePayload: {
     custom_dose_suggestion?: number | null
     pro_notes: string | null
+    updated_at: string
   } = {
     pro_notes: proNotes,
+    updated_at: new Date().toISOString(),
   }
 
   if (shouldUpdateDose) {
@@ -83,7 +85,7 @@ export async function PATCH(request: Request) {
     .update(updatePayload)
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
-    .select('id, custom_dose_suggestion, pro_notes')
+    .select('id, custom_dose_suggestion, pro_notes, updated_at')
     .single()
 
   if (error || !data) {
@@ -129,6 +131,7 @@ export async function PATCH(request: Request) {
     ok: true,
     custom_dose_suggestion: data.custom_dose_suggestion,
     pro_notes: data.pro_notes,
+    guidance_updated_at: data.updated_at,
     email_delivery: emailDelivery,
   })
 }
