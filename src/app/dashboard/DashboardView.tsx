@@ -1,6 +1,7 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
+import type { TimelineStepStatus, WeeklyGoalStatus } from '@/lib/protocol/patient-insights'
 import type { ProgressHistoryTone } from '@/lib/protocol/progress-history'
 import type { ProgressionCriterionStatus } from '@/lib/protocol/progression-readiness'
 import type { TodayPlanStatus } from '@/lib/protocol/today-plan'
@@ -358,6 +359,132 @@ function ProgressHistoryCard({ data }: { data: DashboardData['progressHistory'] 
   )
 }
 
+const GOAL_STYLES: Record<WeeklyGoalStatus, { bar: string; badge: string; label: string }> = {
+  done: {
+    bar: 'bg-emerald-600',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+    label: 'feito',
+  },
+  active: {
+    bar: 'bg-teal-700',
+    badge: 'bg-teal-50 text-teal-800 border-teal-100',
+    label: 'em andamento',
+  },
+  blocked: {
+    bar: 'bg-red-500',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    label: 'pausar',
+  },
+}
+
+function WeeklyGoalsCard({ data }: { data: DashboardData['patientInsights']['weeklyGoals'] }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Metas da semana</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">O que mais ajuda seu progresso agora</h2>
+      </div>
+
+      <div className="space-y-3">
+        {data.map((goal) => {
+          const style = GOAL_STYLES[goal.status]
+          return (
+            <div key={goal.label} className="rounded-lg border border-gray-100 bg-slate-50 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{goal.label}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{goal.detail}</p>
+                </div>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${style.badge}`}>
+                  {style.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex-1 h-2 rounded-full bg-white border border-gray-100 overflow-hidden">
+                  <div className={`h-full rounded-full ${style.bar}`} style={{ width: `${goal.progressPercent}%` }} />
+                </div>
+                <span className="text-xs font-semibold text-gray-700 w-10 text-right">{goal.value}</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const TIMELINE_STYLES: Record<TimelineStepStatus, { dot: string; text: string; border: string }> = {
+  done: {
+    dot: 'bg-emerald-500',
+    text: 'text-emerald-700',
+    border: 'border-emerald-100 bg-emerald-50',
+  },
+  current: {
+    dot: 'bg-teal-700',
+    text: 'text-teal-800',
+    border: 'border-teal-100 bg-teal-50',
+  },
+  next: {
+    dot: 'bg-sky-500',
+    text: 'text-sky-700',
+    border: 'border-sky-100 bg-sky-50',
+  },
+  locked: {
+    dot: 'bg-gray-300',
+    text: 'text-gray-500',
+    border: 'border-gray-100 bg-slate-50',
+  },
+}
+
+function ProtocolTimelineCard({ data }: { data: DashboardData['patientInsights']['timeline'] }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Linha do tempo</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">Onde voce esta no protocolo</h2>
+      </div>
+
+      <div className="space-y-2">
+        {data.map((step) => {
+          const style = TIMELINE_STYLES[step.status]
+          return (
+            <div key={step.phase} className={`flex items-start gap-3 rounded-lg border px-3 py-2 ${style.border}`}>
+              <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${style.dot}`} />
+              <div className="min-w-0">
+                <p className={`text-xs font-semibold ${style.text}`}>
+                  Fase {step.phase} - {step.label}
+                </p>
+                <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{step.detail}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function DoseExplanationCard({ data }: { data: DashboardData['patientInsights']['doseExplanation'] }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Entenda sua dose</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">{data.title}</h2>
+        <p className="text-xs text-gray-600 leading-relaxed mt-1">{data.summary}</p>
+      </div>
+
+      <div className="space-y-2">
+        {data.reasons.map((reason) => (
+          <div key={reason} className="flex items-start gap-2 rounded-lg bg-slate-50 border border-gray-100 px-3 py-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-700 mt-2 flex-shrink-0" />
+            <p className="text-xs text-gray-700 leading-relaxed">{reason}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData['professionalAdjustment']> }) {
   const professionalName = data.professionalName ?? 'Seu profissional'
 
@@ -501,6 +628,12 @@ export default function DashboardView({ data }: { data: DashboardData }) {
         {data.professionalAdjustment && (
           <ProfessionalAdjustmentCard data={data.professionalAdjustment} />
         )}
+
+        <DoseExplanationCard data={data.patientInsights.doseExplanation} />
+
+        <WeeklyGoalsCard data={data.patientInsights.weeklyGoals} />
+
+        <ProtocolTimelineCard data={data.patientInsights.timeline} />
 
         <ProgressionReadinessCard
           data={data.progressionReadiness}

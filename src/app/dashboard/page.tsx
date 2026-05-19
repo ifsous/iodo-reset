@@ -5,6 +5,7 @@
 import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAiLimitPolicy, getCurrentMonthStart, type AiLimitWindow } from '@/lib/ai-limits'
+import { buildPatientInsights, type PatientInsightLog, type PatientInsights } from '@/lib/protocol/patient-insights'
 import { buildProgressHistory, type ProgressHistory, type ProgressHistoryLog } from '@/lib/protocol/progress-history'
 import { buildProgressionReadiness, type ProgressionReadiness, type ProgressionLog } from '@/lib/protocol/progression-readiness'
 import { buildTodayPlan, type TodayPlan, type TodayPlanLog } from '@/lib/protocol/today-plan'
@@ -33,6 +34,7 @@ export interface DashboardData {
   todayPlan:          TodayPlan
   progressionReadiness: ProgressionReadiness
   progressHistory:    ProgressHistory
+  patientInsights:    PatientInsights
   professionalAdjustment: {
     customDoseSuggestion: number | null
     proNotes: string | null
@@ -200,6 +202,7 @@ export default async function DashboardPage() {
   const recentLogSignals = (recentLogs ?? []) as TodayPlanLog[]
   const progressionLogSignals = (recentLogs ?? []) as ProgressionLog[]
   const progressHistoryLogs = (progressLogs ?? []) as ProgressHistoryLog[]
+  const patientInsightLogs = (progressLogs ?? []) as PatientInsightLog[]
   const todayPlan = buildTodayPlan({
     phase: profile.phase,
     riskLevel: profile.protocol_risk_level ?? 'standard',
@@ -218,6 +221,15 @@ export default async function DashboardPage() {
     recentLogs: progressionLogSignals,
   })
   const progressHistory = buildProgressHistory(progressHistoryLogs)
+  const patientInsights = buildPatientInsights({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    recommendedDrops: profile.recommended_dose_drops,
+    protocolStartDate: profile.protocol_start_date,
+    professionalAdjustment,
+    recentLogs: patientInsightLogs,
+  })
 
   const dashboardData: DashboardData = {
     userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
@@ -237,6 +249,7 @@ export default async function DashboardPage() {
     todayPlan,
     progressionReadiness,
     progressHistory,
+    patientInsights,
     professionalAdjustment,
     lastLog:           lastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),
