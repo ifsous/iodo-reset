@@ -7,7 +7,12 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
-import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
+import {
+  LAST_ACTIVITY_COOKIE,
+  REMEMBER_DEVICE_COOKIE,
+  asBrowserSessionCookie,
+  shouldPersistAuthSession,
+} from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
 export async function GET(request: NextRequest) {
@@ -20,6 +25,7 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies()
+    const persistSession = shouldPersistAuthSession(cookieStore.get(REMEMBER_DEVICE_COOKIE)?.value)
 
     const supabase = createServerClient<Database>(
       getSupabaseUrl(),
@@ -32,7 +38,7 @@ export async function GET(request: NextRequest) {
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, asBrowserSessionCookie(options))
+                cookieStore.set(name, value, asBrowserSessionCookie(options, persistSession))
               )
             } catch { /* Route Handler pode setar cookies normalmente */ }
           },
@@ -44,6 +50,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
+      if (!persistSession) {
+        cookieStore.set(LAST_ACTIVITY_COOKIE, Date.now().toString(), {
+          path: '/',
+          sameSite: 'lax',
+        })
+      }
+
       // Verifica se o usuário já tem perfil/onboarding completo
       // Tipo explícito necessário para o TypeScript inferir onboarding_done
       const { data: userData } = await supabase

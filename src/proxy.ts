@@ -7,7 +7,13 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
-import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
+import {
+  LAST_ACTIVITY_COOKIE,
+  REMEMBER_DEVICE_COOKIE,
+  SESSION_IDLE_TIMEOUT_MS,
+  asBrowserSessionCookie,
+  shouldPersistAuthSession,
+} from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
 // Rotas que exigem login
@@ -26,6 +32,7 @@ const PROTECTED_ROUTES = [
 const AUTH_ROUTES = ['/login', '/signup']
 
 export async function proxy(request: NextRequest) {
+  const persistSession = shouldPersistAuthSession(request.cookies.get(REMEMBER_DEVICE_COOKIE)?.value)
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -47,7 +54,7 @@ export async function proxy(request: NextRequest) {
           supabaseResponse = NextResponse.next({ request })
           // Terceiro: replica os cookies na response (para o browser salvar)
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, asBrowserSessionCookie(options))
+            supabaseResponse.cookies.set(name, value, asBrowserSessionCookie(options, persistSession))
           )
         },
       },
@@ -67,6 +74,37 @@ export async function proxy(request: NextRequest) {
   const isProtected = PROTECTED_ROUTES.some((route) =>
     pathname.startsWith(route)
   )
+
+  if (user && isProtected && !persistSession) {
+    const lastActivity = Number(request.cookies.get(LAST_ACTIVITY_COOKIE)?.value ?? 0)
+    const now = Date.now()
+    const sessionExpired = lastActivity > 0 && now - lastActivity > SESSION_IDLE_TIMEOUT_MS
+
+    if (sessionExpired) {
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = '/login'
+      redirectUrl.search = ''
+      redirectUrl.searchParams.set('error', 'session_expired')
+      redirectUrl.searchParams.set('redirectTo', `${pathname}${request.nextUrl.search}`)
+
+      const redirectResponse = NextResponse.redirect(redirectUrl)
+      request.cookies.getAll().forEach(({ name }) => {
+        if (name.startsWith('sb-') || name === LAST_ACTIVITY_COOKIE) {
+          redirectResponse.cookies.set(name, '', {
+            path: '/',
+            maxAge: 0,
+          })
+        }
+      })
+      return redirectResponse
+    }
+
+    supabaseResponse.cookies.set(LAST_ACTIVITY_COOKIE, String(now), {
+      path: '/',
+      sameSite: 'lax',
+    })
+  }
+
   if (!user && isProtected) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'

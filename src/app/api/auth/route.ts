@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import {
+  LAST_ACTIVITY_COOKIE,
+  REMEMBER_DEVICE_COOKIE,
+  REMEMBER_DEVICE_MAX_AGE_SECONDS,
+} from '@/lib/supabase/session-cookies'
 
 type AuthAction = 'login' | 'signup' | 'reset' | 'resend_signup'
 
@@ -9,6 +15,7 @@ interface AuthPayload {
   password?: string
   name?: string
   redirectTo?: string
+  rememberDevice?: boolean
 }
 
 function getOrigin(request: NextRequest): string {
@@ -41,13 +48,54 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Dados de autenticação incompletos.' }, { status: 400 })
   }
 
+  const cookieStore = await cookies()
+
+  if (action === 'login') {
+    if (payload.rememberDevice) {
+      cookieStore.set(REMEMBER_DEVICE_COOKIE, '1', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: REMEMBER_DEVICE_MAX_AGE_SECONDS,
+      })
+    } else {
+      cookieStore.set(REMEMBER_DEVICE_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+    }
+  }
+
   const supabase = await createClient()
 
   if (action === 'login') {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      cookieStore.set(REMEMBER_DEVICE_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+      cookieStore.set(LAST_ACTIVITY_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
       return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    if (!payload.rememberDevice) {
+      cookieStore.set(LAST_ACTIVITY_COOKIE, Date.now().toString(), {
+        path: '/',
+        sameSite: 'lax',
+      })
+    } else {
+      cookieStore.set(LAST_ACTIVITY_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
     }
 
     return NextResponse.json({ ok: true })

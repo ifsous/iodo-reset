@@ -19,6 +19,10 @@ const ERRORS: Record<string, string> = {
 }
 
 function translateError(msg: string): string {
+  if (msg.includes('session_expired')) {
+    return 'Sua sessao expirou por inatividade. Entre novamente.'
+  }
+
   for (const [key, value] of Object.entries(ERRORS)) {
     if (msg.includes(key)) return value
   }
@@ -40,6 +44,7 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [name,     setName]     = useState('')
   const [loading,  setLoading]  = useState(false)
+  const [rememberDevice, setRememberDevice] = useState(false)
   const [error,    setError]    = useState<string | null>(
     () => callbackError ? translateError(callbackError) : null
   )
@@ -59,6 +64,7 @@ export default function LoginForm() {
     password?: string
     name?: string
     redirectTo?: string
+    rememberDevice?: boolean
   }): Promise<string | null> {
     const response = await fetch('/api/auth', {
       method: 'POST',
@@ -80,6 +86,7 @@ export default function LoginForm() {
       action: 'login',
       email: email.trim(),
       password,
+      rememberDevice,
     })
 
     if (error) {
@@ -254,6 +261,20 @@ export default function LoginForm() {
       <form onSubmit={submitHandler} noValidate className="space-y-4">
 
         {/* Nome — só no cadastro */}
+        {mode === 'login' && (
+          <label className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(event) => setRememberDevice(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+            />
+            <span>
+              Lembrar neste dispositivo por 30 dias. Sem isso, a sessao encerra ao fechar o navegador ou apos inatividade.
+            </span>
+          </label>
+        )}
+
         {mode === 'signup' && (
           <Field label="Nome completo" htmlFor="name">
             <Input

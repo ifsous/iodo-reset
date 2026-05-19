@@ -3,6 +3,10 @@
 import { useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import {
+  LAST_ACTIVITY_COOKIE,
+  REMEMBER_DEVICE_COOKIE,
+} from '@/lib/supabase/session-cookies'
 import type { ProfileData } from './types'
 import type { Json, PlanType, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SexType, SymptomType } from '@/lib/supabase/types'
 
@@ -327,6 +331,8 @@ export default function ProfileView({ data }: { data: ProfileData }) {
 
   async function signOut() {
     await supabase.auth.signOut()
+    document.cookie = `${REMEMBER_DEVICE_COOKIE}=; Path=/; Max-Age=0`
+    document.cookie = `${LAST_ACTIVITY_COOKIE}=; Path=/; Max-Age=0`
     router.push('/login')
     router.refresh()
   }

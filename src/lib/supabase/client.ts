@@ -4,7 +4,11 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
-import { asBrowserSessionCookie } from '@/lib/supabase/session-cookies'
+import {
+  REMEMBER_DEVICE_COOKIE,
+  asBrowserSessionCookie,
+  shouldPersistAuthSession,
+} from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
 type BrowserCookieOptions = {
@@ -32,8 +36,13 @@ function getAllCookies() {
     })
 }
 
+function getCookieValue(name: string): string | undefined {
+  return getAllCookies().find((cookie) => cookie.name === name)?.value
+}
+
 function setCookie(name: string, value: string, options: BrowserCookieOptions) {
-  const sessionOptions = asBrowserSessionCookie(options)
+  const persistSession = shouldPersistAuthSession(getCookieValue(REMEMBER_DEVICE_COOKIE))
+  const sessionOptions = asBrowserSessionCookie(options, persistSession)
   const parts = [`${name}=${value}`, `Path=${sessionOptions.path ?? '/'}`]
 
   if (sessionOptions.domain) parts.push(`Domain=${sessionOptions.domain}`)
