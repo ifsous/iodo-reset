@@ -154,7 +154,6 @@ export default async function DashboardPage() {
     .select('professional_id, custom_dose_suggestion, pro_notes')
     .eq('patient_id', user.id)
     .eq('status', 'active')
-    .not('custom_dose_suggestion', 'is', null)
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle<{
@@ -171,7 +170,12 @@ export default async function DashboardPage() {
         .maybeSingle<{ display_name: string | null }>()
     : { data: null }
 
-  const professionalAdjustment = professionalLink
+  const hasProfessionalGuidance = Boolean(
+    professionalLink?.pro_notes?.trim() ||
+    professionalLink?.custom_dose_suggestion !== null && professionalLink?.custom_dose_suggestion !== undefined
+  )
+
+  const professionalAdjustment = professionalLink && hasProfessionalGuidance
     ? {
         customDoseSuggestion: professionalLink.custom_dose_suggestion,
         proNotes: professionalLink.pro_notes,

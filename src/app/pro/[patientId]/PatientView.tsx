@@ -77,6 +77,9 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSaved, setNotesSaved] = useState(false)
   const [copiedMessage, setCopiedMessage] = useState(false)
+  const [sendingGuidance, setSendingGuidance] = useState(false)
+  const [guidanceSent, setGuidanceSent] = useState(false)
+  const [guidanceError, setGuidanceError] = useState<string | null>(null)
 
   function scrollToSection(ref: React.RefObject<HTMLElement | null>) {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -86,6 +89,38 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
     await navigator.clipboard.writeText(data.clinicalSummary.messageSuggestion)
     setCopiedMessage(true)
     window.setTimeout(() => setCopiedMessage(false), 2500)
+  }
+
+  async function sendSuggestedGuidance() {
+    setSendingGuidance(true)
+    setGuidanceSent(false)
+    setGuidanceError(null)
+
+    const response = await fetch('/api/pro/protocol-adjustment', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_id: patient.id,
+        pro_notes: data.clinicalSummary.messageSuggestion,
+      }),
+    })
+
+    const result = await response.json() as {
+      error?: string
+      custom_dose_suggestion?: number | null
+      pro_notes?: string | null
+    }
+    setSendingGuidance(false)
+
+    if (!response.ok) {
+      setGuidanceError(result.error ?? 'Erro ao enviar orientacao.')
+      return
+    }
+
+    setNotes(result.pro_notes ?? data.clinicalSummary.messageSuggestion)
+    setCustomDose(result.custom_dose_suggestion?.toString() ?? '')
+    setGuidanceSent(true)
+    router.refresh()
   }
 
   async function saveAdjustment() {
@@ -201,15 +236,33 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
               Revisar exames
             </button>
             <button
-              onClick={copyPatientMessage}
+              onClick={sendSuggestedGuidance}
+              disabled={sendingGuidance}
               className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-2.5 text-xs font-medium text-teal-900 hover:bg-teal-100 transition-colors"
             >
-              {copiedMessage ? 'Copiado' : 'Copiar aviso'}
+              {sendingGuidance ? 'Enviando...' : 'Enviar orientacao'}
             </button>
           </div>
-          <p className="text-xs text-gray-500 leading-relaxed mt-3">
-            Mensagem sugerida: {data.clinicalSummary.messageSuggestion}
-          </p>
+          <div className="rounded-lg border border-gray-100 bg-slate-50 p-3 mt-3">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Mensagem sugerida: {data.clinicalSummary.messageSuggestion}
+            </p>
+            <button
+              type="button"
+              onClick={copyPatientMessage}
+              className="text-xs font-medium text-teal-800 hover:text-teal-900 mt-2"
+            >
+              {copiedMessage ? 'Texto copiado' : 'Copiar texto'}
+            </button>
+          </div>
+          {guidanceError && (
+            <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3 mt-3">{guidanceError}</p>
+          )}
+          {guidanceSent && (
+            <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
+              Orientacao enviada e registrada no dashboard do paciente.
+            </p>
+          )}
         </Card>
 
         <div className="grid grid-cols-3 gap-3">

@@ -40,7 +40,8 @@ export async function PATCH(request: Request) {
   const patientId = typeof body.patient_id === 'string' ? body.patient_id.trim() : ''
   if (!patientId) return jsonError('patient_id e obrigatorio.')
 
-  const customDoseSuggestion = parseDose(body.custom_dose_suggestion)
+  const shouldUpdateDose = Object.prototype.hasOwnProperty.call(body, 'custom_dose_suggestion')
+  const customDoseSuggestion = shouldUpdateDose ? parseDose(body.custom_dose_suggestion) : null
   if (Number.isNaN(customDoseSuggestion)) {
     return jsonError('Dose sugerida deve ser um numero inteiro entre 0 e 50 gotas.')
   }
@@ -66,12 +67,20 @@ export async function PATCH(request: Request) {
 
   if (!professional) return jsonError('Perfil profissional nao encontrado.', 404)
 
+  const updatePayload: {
+    custom_dose_suggestion?: number | null
+    pro_notes: string | null
+  } = {
+    pro_notes: proNotes,
+  }
+
+  if (shouldUpdateDose) {
+    updatePayload.custom_dose_suggestion = customDoseSuggestion
+  }
+
   const { data, error } = await supabase
     .from('pro_patients')
-    .update({
-      custom_dose_suggestion: customDoseSuggestion,
-      pro_notes: proNotes,
-    })
+    .update(updatePayload)
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
     .select('id, custom_dose_suggestion, pro_notes')

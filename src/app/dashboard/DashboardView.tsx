@@ -656,29 +656,34 @@ function DoseExplanationCard({ data }: { data: DashboardData['patientInsights'][
 
 function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData['professionalAdjustment']> }) {
   const professionalName = data.professionalName ?? 'Seu profissional'
+  const hasDoseSuggestion = data.customDoseSuggestion !== null && data.customDoseSuggestion !== undefined
 
   return (
     <div className="bg-white rounded-lg border border-teal-100 p-4 shadow-sm space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-gray-500 mb-1">Ajuste do profissional</p>
+          <p className="text-xs text-gray-500 mb-1">{hasDoseSuggestion ? 'Ajuste do profissional' : 'Orientacao do profissional'}</p>
           <h2 className="text-base font-semibold text-gray-900 leading-tight">{professionalName}</h2>
         </div>
         <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-teal-50 text-teal-800 border-teal-100 whitespace-nowrap">
           Ativo
         </span>
       </div>
-      <div className="rounded-lg bg-teal-50 border border-teal-100 p-3">
-        <p className="text-xs text-teal-700 mb-1">Dose sugerida</p>
-        <p className="text-xl font-semibold text-teal-900">
-          {data.customDoseSuggestion} gota{data.customDoseSuggestion === 1 ? '' : 's'}
-        </p>
-      </div>
+      {hasDoseSuggestion && (
+        <div className="rounded-lg bg-teal-50 border border-teal-100 p-3">
+          <p className="text-xs text-teal-700 mb-1">Dose sugerida</p>
+          <p className="text-xl font-semibold text-teal-900">
+            {data.customDoseSuggestion} gota{data.customDoseSuggestion === 1 ? '' : 's'}
+          </p>
+        </div>
+      )}
       {data.proNotes && (
         <p className="text-sm text-gray-700 leading-relaxed">{data.proNotes}</p>
       )}
       <p className="text-xs text-gray-500 leading-relaxed">
-        Este ajuste orienta o Plano de Hoje, exceto quando houver alerta de seguranca como semaforo vermelho ou palpitacoes.
+        {hasDoseSuggestion
+          ? 'Este ajuste orienta o Plano de Hoje, exceto quando houver alerta de seguranca como semaforo vermelho ou palpitacoes.'
+          : 'Esta orientacao fica registrada no seu acompanhamento e pode ser atualizada pelo profissional.'}
       </p>
     </div>
   )
