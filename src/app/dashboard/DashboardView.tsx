@@ -1,4 +1,5 @@
 'use client'
+import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
 import type { TimelineStepStatus, WeeklyGoalStatus } from '@/lib/protocol/patient-insights'
@@ -658,6 +659,35 @@ function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData[
   const professionalName = data.professionalName ?? 'Seu profissional'
   const hasDoseSuggestion = data.customDoseSuggestion !== null && data.customDoseSuggestion !== undefined
   const router = useRouter()
+  const [status, setStatus] = useState(data.latestGuidance?.status ?? null)
+  const [busyAction, setBusyAction] = useState<'read' | 'question' | null>(null)
+  const [guidanceError, setGuidanceError] = useState<string | null>(null)
+
+  async function acknowledgeGuidance(action: 'read' | 'question') {
+    if (!data.latestGuidance) return
+
+    setBusyAction(action)
+    setGuidanceError(null)
+
+    const response = await fetch('/api/pro/guidance', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        guidance_id: data.latestGuidance.id,
+        action,
+        feedback: action === 'question' ? 'Paciente marcou que tem duvida sobre a orientacao.' : null,
+      }),
+    })
+    const result = await response.json() as { error?: string; guidance?: { status: 'sent' | 'read' | 'question' | 'responded' } }
+    setBusyAction(null)
+
+    if (!response.ok || !result.guidance) {
+      setGuidanceError(result.error ?? 'Nao foi possivel atualizar a orientacao.')
+      return
+    }
+
+    setStatus(result.guidance.status)
+  }
 
   return (
     <div className="bg-white rounded-lg border border-teal-100 p-4 shadow-sm space-y-3">
@@ -680,6 +710,48 @@ function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData[
       )}
       {data.proNotes && (
         <p className="text-sm text-gray-700 leading-relaxed">{data.proNotes}</p>
+      )}
+      {data.latestGuidance && (
+        <div className="rounded-lg border border-gray-100 bg-slate-50 p-3 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-xs font-medium text-gray-700">Historico da orientacao</p>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${
+              status === 'question'
+                ? 'bg-amber-50 text-amber-800 border-amber-100'
+                : status === 'read' || status === 'responded'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-100'
+                  : 'bg-gray-50 text-gray-600 border-gray-100'
+            }`}>
+              {status === 'question' ? 'Duvida enviada' : status === 'read' ? 'Lida' : status === 'responded' ? 'Respondida' : 'Enviada'}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Enviada em {new Date(data.latestGuidance.sentAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </p>
+          {guidanceError && (
+            <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2">{guidanceError}</p>
+          )}
+          {status === 'sent' && (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void acknowledgeGuidance('read')}
+                className="rounded-lg border border-emerald-100 bg-white text-emerald-800 text-xs font-medium py-2 hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {busyAction === 'read' ? 'Salvando...' : 'Li e entendi'}
+              </button>
+              <button
+                type="button"
+                disabled={Boolean(busyAction)}
+                onClick={() => void acknowledgeGuidance('question')}
+                className="rounded-lg border border-amber-100 bg-white text-amber-800 text-xs font-medium py-2 hover:bg-amber-50 disabled:opacity-50"
+              >
+                {busyAction === 'question' ? 'Enviando...' : 'Tenho duvida'}
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {data.updatedAt && (
         <p className="text-xs text-gray-500">

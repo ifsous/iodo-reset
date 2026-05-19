@@ -362,6 +362,40 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['pro_invites']['Insert']>
         Relationships: []
       }
+      pro_guidance_history: {
+        Row: {
+          id: string
+          professional_id: string
+          patient_id: string
+          pro_patient_id: string | null
+          message: string
+          custom_dose_suggestion: number | null
+          status: 'sent' | 'read' | 'question' | 'responded'
+          patient_feedback: string | null
+          sent_at: string
+          acknowledged_at: string | null
+          responded_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          professional_id: string
+          patient_id: string
+          pro_patient_id?: string | null
+          message: string
+          custom_dose_suggestion?: number | null
+          status?: 'sent' | 'read' | 'question' | 'responded'
+          patient_feedback?: string | null
+          sent_at?: string
+          acknowledged_at?: string | null
+          responded_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['pro_guidance_history']['Insert']>
+        Relationships: []
+      }
       admin_audit_logs: {
         Row: {
           id: string

@@ -60,6 +60,16 @@ export interface PatientDetailData {
     isWithinRange: boolean | null
     aiInterpretation: string | null
   }[]
+  guidanceHistory: {
+    id: string
+    message: string
+    customDoseSuggestion: number | null
+    status: 'sent' | 'read' | 'question' | 'responded'
+    patientFeedback: string | null
+    sentAt: string
+    acknowledgedAt: string | null
+    respondedAt: string | null
+  }[]
   clinicalSummary: ProPatientClinicalSummary
 }
 
@@ -137,7 +147,7 @@ export default async function PatientPage({
 
   if (!patientRow) notFound()
 
-  const [{ data: logs }, { data: exams }] = await Promise.all([
+  const [{ data: logs }, { data: exams }, { data: guidanceHistoryRows }] = await Promise.all([
     supabase
       .from('daily_logs')
       .select('log_date, semaphore, energy, mood, sleep_quality, dose_drops, symptoms, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt')
@@ -151,6 +161,23 @@ export default async function PatientPage({
       .eq('user_id', patientId)
       .order('exam_date', { ascending: false })
       .limit(8),
+    supabase
+      .from('pro_guidance_history')
+      .select('id, message, custom_dose_suggestion, status, patient_feedback, sent_at, acknowledged_at, responded_at')
+      .eq('professional_id', professional.id)
+      .eq('patient_id', patientId)
+      .order('sent_at', { ascending: false })
+      .limit(8)
+      .returns<{
+        id: string
+        message: string
+        custom_dose_suggestion: number | null
+        status: 'sent' | 'read' | 'question' | 'responded'
+        patient_feedback: string | null
+        sent_at: string
+        acknowledged_at: string | null
+        responded_at: string | null
+      }[]>(),
   ])
 
   const { data: proPatient } = await supabase
@@ -220,6 +247,16 @@ export default async function PatientPage({
     },
     logs: mappedLogs,
     exams: mappedExams,
+    guidanceHistory: (guidanceHistoryRows ?? []).map((item) => ({
+      id: item.id,
+      message: item.message,
+      customDoseSuggestion: item.custom_dose_suggestion,
+      status: item.status,
+      patientFeedback: item.patient_feedback,
+      sentAt: item.sent_at,
+      acknowledgedAt: item.acknowledged_at,
+      respondedAt: item.responded_at,
+    })),
     clinicalSummary,
   }
 

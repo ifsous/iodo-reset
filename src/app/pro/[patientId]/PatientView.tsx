@@ -37,6 +37,20 @@ const SUMMARY_DOT_CLASS = {
   urgent: 'bg-red-500',
 }
 
+const GUIDANCE_STATUS_LABELS = {
+  sent: 'Enviada',
+  read: 'Lida',
+  question: 'Duvida',
+  responded: 'Respondida',
+}
+
+const GUIDANCE_STATUS_BADGE = {
+  sent: 'bg-gray-50 text-gray-600 border-gray-100',
+  read: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+  question: 'bg-amber-50 text-amber-800 border-amber-100',
+  responded: 'bg-sky-50 text-sky-800 border-sky-100',
+}
+
 function initials(name: string | null, email: string) {
   const source = name?.trim() || email
   return source.split(/\s+|@/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'IR'
@@ -277,8 +291,43 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
           )}
           {guidanceSent && (
             <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-3 mt-3">
-              Orientacao enviada e registrada no dashboard do paciente.
+              Orientacao enviada e registrada no historico do paciente.
             </p>
+          )}
+        </Card>
+
+        <Card title="Historico de orientacoes">
+          {data.guidanceHistory.length > 0 ? (
+            <div className="space-y-2">
+              {data.guidanceHistory.map((guidance) => (
+                <div key={guidance.id} className="rounded-lg border border-gray-100 bg-slate-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-gray-400">{formatDateTime(guidance.sentAt)}</p>
+                      <p className="text-sm text-gray-800 leading-relaxed mt-1">{guidance.message}</p>
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${GUIDANCE_STATUS_BADGE[guidance.status]}`}>
+                      {GUIDANCE_STATUS_LABELS[guidance.status]}
+                    </span>
+                  </div>
+                  {guidance.customDoseSuggestion !== null && (
+                    <p className="text-xs text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-2 py-1 mt-2">
+                      Dose sugerida: {guidance.customDoseSuggestion} gotas
+                    </p>
+                  )}
+                  {guidance.patientFeedback && (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-2 py-1 mt-2">
+                      Retorno do paciente: {guidance.patientFeedback}
+                    </p>
+                  )}
+                  {guidance.acknowledgedAt && (
+                    <p className="text-[11px] text-gray-400 mt-2">Ciencia em {formatDateTime(guidance.acknowledgedAt)}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">Nenhuma orientacao historica registrada ainda.</p>
           )}
         </Card>
 

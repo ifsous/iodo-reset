@@ -84,6 +84,36 @@ export async function PATCH(request: Request) {
     return jsonError('Paciente nao encontrado para este profissional.', 404)
   }
 
+  const guidanceMessage = proNotes?.trim()
+  if (guidanceMessage) {
+    const { error: guidanceError } = await createAdminClient()
+      .from('pro_guidance_history')
+      .insert({
+        professional_id: professional.id,
+        patient_id: patientId,
+        pro_patient_id: data.id,
+        message: guidanceMessage,
+        custom_dose_suggestion: data.custom_dose_suggestion,
+        status: 'sent',
+      })
+
+    if (guidanceError && guidanceError.code !== '42P01') {
+      await safeRecordOperationalEvent(createAdminClient(), {
+        severity: 'warning',
+        area: 'pro',
+        eventType: 'pro_guidance_history_insert_failed',
+        message: 'Orientacao profissional enviada, mas historico nao foi gravado.',
+        userId: patientId,
+        metadata: {
+          professional_id: professional.id,
+          pro_patient_id: data.id,
+          error: guidanceError.message,
+          code: guidanceError.code,
+        },
+      })
+    }
+  }
+
   const { data: patient } = await supabase
     .from('users')
     .select('email, full_name')

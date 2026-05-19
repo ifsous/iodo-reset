@@ -42,6 +42,15 @@ export interface DashboardData {
     proNotes: string | null
     professionalName: string | null
     updatedAt: string | null
+    latestGuidance: {
+      id: string
+      message: string
+      status: 'sent' | 'read' | 'question' | 'responded'
+      patientFeedback: string | null
+      sentAt: string
+      acknowledgedAt: string | null
+      respondedAt: string | null
+    } | null
   } | null
   lastLog: {
     id:           string
@@ -177,12 +186,42 @@ export default async function DashboardPage() {
     professionalLink?.custom_dose_suggestion !== null && professionalLink?.custom_dose_suggestion !== undefined
   )
 
+  const { data: latestGuidanceRow } = professionalLink
+    ? await supabase
+        .from('pro_guidance_history')
+        .select('id, message, status, patient_feedback, sent_at, acknowledged_at, responded_at')
+        .eq('patient_id', user.id)
+        .eq('professional_id', professionalLink.professional_id)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle<{
+          id: string
+          message: string
+          status: 'sent' | 'read' | 'question' | 'responded'
+          patient_feedback: string | null
+          sent_at: string
+          acknowledged_at: string | null
+          responded_at: string | null
+        }>()
+    : { data: null }
+
   const professionalAdjustment = professionalLink && hasProfessionalGuidance
     ? {
         customDoseSuggestion: professionalLink.custom_dose_suggestion,
         proNotes: professionalLink.pro_notes,
         professionalName: professionalAdjustmentSource?.display_name ?? null,
         updatedAt: professionalLink.updated_at,
+        latestGuidance: latestGuidanceRow
+          ? {
+              id: latestGuidanceRow.id,
+              message: latestGuidanceRow.message,
+              status: latestGuidanceRow.status,
+              patientFeedback: latestGuidanceRow.patient_feedback,
+              sentAt: latestGuidanceRow.sent_at,
+              acknowledgedAt: latestGuidanceRow.acknowledged_at,
+              respondedAt: latestGuidanceRow.responded_at,
+            }
+          : null,
       }
     : null
 
