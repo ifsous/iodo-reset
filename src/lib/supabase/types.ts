@@ -361,6 +361,36 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['pro_invites']['Insert']>
         Relationships: []
       }
+      admin_audit_logs: {
+        Row: {
+          id: string
+          actor_user_id: string | null
+          actor_email: string
+          action: string
+          target_user_id: string | null
+          target_email: string | null
+          summary: string | null
+          before_state: Json | null
+          after_state: Json | null
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          actor_user_id?: string | null
+          actor_email: string
+          action: string
+          target_user_id?: string | null
+          target_email?: string | null
+          summary?: string | null
+          before_state?: Json | null
+          after_state?: Json | null
+          metadata?: Json
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['admin_audit_logs']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       v_pro_dashboard: {

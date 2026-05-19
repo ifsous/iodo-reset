@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlanType } from '@/lib/supabase/types'
+import type { AdminAuditLog } from '@/lib/admin-audit'
 import type { AdminUser } from '@/lib/admin-users'
 
 type Patch = {
@@ -41,6 +42,13 @@ function planClass(plan: PlanType): string {
   if (plan === 'clinic') return 'bg-indigo-50 text-indigo-800 border-indigo-100'
   if (plan === 'pro') return 'bg-teal-50 text-teal-800 border-teal-100'
   return 'bg-gray-50 text-gray-600 border-gray-100'
+}
+
+function auditLabel(action: string): string {
+  if (action === 'update_user_access') return 'Acesso atualizado'
+  if (action === 'resend_confirmation') return 'Confirmacao reenviada'
+  if (action === 'resend_confirmation_skipped') return 'Reenvio ignorado'
+  return action.replaceAll('_', ' ')
 }
 
 function Toggle({ active, label, onClick, disabled }: {
@@ -85,12 +93,21 @@ function Metric({ label, value, tone = 'gray' }: {
   )
 }
 
-export default function AdminView({ adminEmail, initialUsers }: { adminEmail: string; initialUsers: AdminUser[] }) {
+export default function AdminView({
+  adminEmail,
+  initialUsers,
+  initialAuditLogs,
+}: {
+  adminEmail: string
+  initialUsers: AdminUser[]
+  initialAuditLogs: AdminAuditLog[]
+}) {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [planFilter, setPlanFilter] = useState<PlanType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(initialAuditLogs)
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -108,7 +125,11 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
     if (statusFilter !== 'all') params.set('status', statusFilter)
 
     const response = await fetch(`/api/admin/users?${params.toString()}`)
-    const result = await response.json() as { users?: AdminUser[]; error?: string }
+    const result = await response.json() as {
+      users?: AdminUser[]
+      auditLogs?: AdminAuditLog[]
+      error?: string
+    }
 
     if (!response.ok) {
       setError(result.error ?? 'Erro ao buscar usuarios.')
@@ -117,6 +138,7 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
     }
 
     setUsers(result.users ?? [])
+    if (result.auditLogs) setAuditLogs(result.auditLogs)
     setLoading(false)
   }
 
@@ -130,7 +152,11 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId, ...patch }),
     })
-    const result = await response.json() as { user?: AdminUser; error?: string }
+    const result = await response.json() as {
+      user?: AdminUser
+      auditLogs?: AdminAuditLog[]
+      error?: string
+    }
 
     if (!response.ok || !result.user) {
       setError(result.error ?? 'Erro ao atualizar usuario.')
@@ -139,6 +165,7 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
     }
 
     setUsers((current) => current.map((user) => user.id === userId ? result.user! : user))
+    if (result.auditLogs) setAuditLogs(result.auditLogs)
     setSavingId(null)
   }
 
@@ -152,7 +179,11 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'resend_confirmation', user_id: userId }),
     })
-    const result = await response.json() as { message?: string; error?: string }
+    const result = await response.json() as {
+      message?: string
+      auditLogs?: AdminAuditLog[]
+      error?: string
+    }
 
     if (!response.ok) {
       setError(result.error ?? 'Erro ao reenviar confirmacao.')
@@ -161,6 +192,7 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
     }
 
     setNotice(result.message ?? 'Confirmacao reenviada.')
+    if (result.auditLogs) setAuditLogs(result.auditLogs)
     setActionId(null)
   }
 
@@ -346,6 +378,44 @@ export default function AdminView({ adminEmail, initialUsers }: { adminEmail: st
                 </article>
               )
             })
+          )}
+        </section>
+
+        <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-950">Atividade administrativa</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Ultimas acoes feitas pelo suporte.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadUsers()}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Atualizar
+            </button>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Nenhuma atividade registrada ainda.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {auditLogs.map((log) => (
+                <div key={log.id} className="py-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <p className="text-sm font-medium text-gray-900">{auditLabel(log.action)}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(log.created_at)}</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {log.summary ?? 'Acao administrativa registrada.'}
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-400">
+                    <span>Admin: {log.actor_email}</span>
+                    {log.target_email && <span>Usuario: {log.target_email}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 

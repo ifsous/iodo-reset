@@ -8,6 +8,7 @@ import {
   filterAdminUsersByStatus,
   type AdminUserRow,
 } from '@/lib/admin-users'
+import { listAdminAuditLogs } from '@/lib/admin-audit'
 import AdminView from './AdminView'
 
 export const metadata = {
@@ -29,11 +30,13 @@ export default async function AdminPage() {
     .limit(50)
 
   const enrichedUsers = await enrichAdminUsers(adminSupabase, (users ?? []) as AdminUserRow[])
+  const auditLogs = await listAdminAuditLogs(adminSupabase)
 
   return (
     <AdminView
       adminEmail={user.email ?? ''}
       initialUsers={filterAdminUsersByStatus(enrichedUsers, 'all')}
+      initialAuditLogs={auditLogs}
     />
   )
 }

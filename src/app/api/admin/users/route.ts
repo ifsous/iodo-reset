@@ -10,6 +10,7 @@ import {
   filterAdminUsersByStatus,
   type AdminUserRow,
 } from '@/lib/admin-users'
+import { listAdminAuditLogs, recordAdminAuditLog } from '@/lib/admin-audit'
 
 const VALID_PLANS = new Set<PlanType>(['free', 'pro', 'clinic'])
 
@@ -25,15 +26,29 @@ type AdminUserAction = {
   user_id?: string
 }
 
-async function requireAdmin(): Promise<NextResponse | null> {
+type AdminActor = {
+  id: string
+  email: string
+}
+
+async function requireAdmin(): Promise<{ actor: AdminActor | null; response: NextResponse | null }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user || !isAdminEmail(user.email)) {
-    return NextResponse.json({ error: 'Acesso admin necessario.' }, { status: 403 })
+    return {
+      actor: null,
+      response: NextResponse.json({ error: 'Acesso admin necessario.' }, { status: 403 }),
+    }
   }
 
-  return null
+  return {
+    actor: {
+      id: user.id,
+      email: user.email,
+    },
+    response: null,
+  }
 }
 
 function cleanSearch(value: string | null): string {
@@ -73,8 +88,8 @@ async function ensureProfessionalProfile(
 }
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdmin()
-  if (admin) return admin
+  const { response } = await requireAdmin()
+  if (response) return response
 
   const search = cleanSearch(request.nextUrl.searchParams.get('q'))
   const plan = request.nextUrl.searchParams.get('plan')
@@ -105,12 +120,14 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     users: filterAdminUsersByStatus(enrichedUsers, status),
+    auditLogs: await listAdminAuditLogs(supabase),
   })
 }
 
 export async function POST(request: NextRequest) {
-  const admin = await requireAdmin()
-  if (admin) return admin
+  const { actor, response } = await requireAdmin()
+  if (response) return response
+  if (!actor) return NextResponse.json({ error: 'Acesso admin necessario.' }, { status: 403 })
 
   const payload = await request.json().catch(() => ({})) as AdminUserAction
   if (payload.action !== 'resend_confirmation' || !payload.user_id) {
@@ -130,7 +147,21 @@ export async function POST(request: NextRequest) {
 
   const { data: authUser } = await supabase.auth.admin.getUserById(user.id)
   if (authUser.user?.email_confirmed_at) {
-    return NextResponse.json({ ok: true, message: 'Este e-mail ja esta confirmado.' })
+    await recordAdminAuditLog(supabase, {
+      actor,
+      action: 'resend_confirmation_skipped',
+      targetUserId: user.id,
+      targetEmail: user.email,
+      summary: 'Reenvio ignorado: e-mail ja confirmado.',
+      afterState: {
+        email_confirmed_at: authUser.user.email_confirmed_at,
+      },
+    })
+    return NextResponse.json({
+      ok: true,
+      message: 'Este e-mail ja esta confirmado.',
+      auditLogs: await listAdminAuditLogs(supabase),
+    })
   }
 
   const { error } = await supabase.auth.resend({
@@ -145,12 +176,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, message: 'Confirmacao reenviada.' })
+  await recordAdminAuditLog(supabase, {
+    actor,
+    action: 'resend_confirmation',
+    targetUserId: user.id,
+    targetEmail: user.email,
+    summary: 'E-mail de confirmacao reenviado pelo admin.',
+  })
+
+  return NextResponse.json({
+    ok: true,
+    message: 'Confirmacao reenviada.',
+    auditLogs: await listAdminAuditLogs(supabase),
+  })
 }
 
 export async function PATCH(request: NextRequest) {
-  const admin = await requireAdmin()
-  if (admin) return admin
+  const { actor, response } = await requireAdmin()
+  if (response) return response
+  if (!actor) return NextResponse.json({ error: 'Acesso admin necessario.' }, { status: 403 })
 
   const payload = await request.json().catch(() => ({})) as AdminUserPatch
   if (!payload.user_id) {
@@ -191,6 +235,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = createAdminClient()
+  const { data: beforeUser } = await supabase
+    .from('users')
+    .select(ADMIN_USER_SELECT)
+    .eq('id', payload.user_id)
+    .maybeSingle<AdminUserRow>()
+
   const { data, error } = await supabase
     .from('users')
     .update(update)
@@ -206,6 +256,19 @@ export async function PATCH(request: NextRequest) {
     await ensureProfessionalProfile(supabase, data)
   }
 
+  await recordAdminAuditLog(supabase, {
+    actor,
+    action: 'update_user_access',
+    targetUserId: data.id,
+    targetEmail: data.email,
+    summary: 'Acesso do usuario atualizado pelo admin.',
+    beforeState: beforeUser ?? null,
+    afterState: data,
+    metadata: {
+      patch: update,
+    },
+  })
+
   revalidatePath('/admin')
   revalidatePath('/dashboard')
   revalidatePath('/profile')
@@ -214,5 +277,8 @@ export async function PATCH(request: NextRequest) {
 
   const [enrichedUser] = await enrichAdminUsers(supabase, [data])
 
-  return NextResponse.json({ user: enrichedUser })
+  return NextResponse.json({
+    user: enrichedUser,
+    auditLogs: await listAdminAuditLogs(supabase),
+  })
 }
