@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { safeRecordOperationalEvent } from '@/lib/operational-events'
 import {
   LAST_ACTIVITY_COOKIE,
   REMEMBER_DEVICE_COOKIE,
@@ -36,6 +38,25 @@ function safeRedirectPath(value: unknown): string {
   if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return '/dashboard'
 
   return trimmed
+}
+
+async function recordAuthIssue(input: {
+  action: AuthAction
+  email: string
+  error: string
+  severity?: 'warning' | 'critical'
+}) {
+  await safeRecordOperationalEvent(createAdminClient(), {
+    severity: input.severity ?? 'warning',
+    area: 'auth',
+    eventType: `${input.action}_failed`,
+    message: `Falha em ${input.action}: ${input.error}`,
+    userEmail: input.email,
+    metadata: {
+      action: input.action,
+      error: input.error,
+    },
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -82,6 +103,7 @@ export async function POST(request: NextRequest) {
         sameSite: 'lax',
         maxAge: 0,
       })
+      await recordAuthIssue({ action, email, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -113,6 +135,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
+      await recordAuthIssue({ action, email, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -126,6 +149,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
+      await recordAuthIssue({ action, email, error: error.message })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
@@ -143,6 +167,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
+      await recordAuthIssue({ action, email, error: error.message, severity: 'critical' })
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 

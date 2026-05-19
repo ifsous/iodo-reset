@@ -391,6 +391,34 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['admin_audit_logs']['Insert']>
         Relationships: []
       }
+      operational_events: {
+        Row: {
+          id: string
+          severity: 'info' | 'warning' | 'critical'
+          area: string
+          event_type: string
+          message: string
+          user_id: string | null
+          user_email: string | null
+          metadata: Json
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          severity: 'info' | 'warning' | 'critical'
+          area: string
+          event_type: string
+          message: string
+          user_id?: string | null
+          user_email?: string | null
+          metadata?: Json
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['operational_events']['Insert']>
+        Relationships: []
+      }
     }
     Views: {
       v_pro_dashboard: {

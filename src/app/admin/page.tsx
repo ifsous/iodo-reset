@@ -9,6 +9,7 @@ import {
   type AdminUserRow,
 } from '@/lib/admin-users'
 import { listAdminAuditLogs } from '@/lib/admin-audit'
+import { listOperationalEvents } from '@/lib/operational-events'
 import AdminView from './AdminView'
 
 export const metadata = {
@@ -31,12 +32,14 @@ export default async function AdminPage() {
 
   const enrichedUsers = await enrichAdminUsers(adminSupabase, (users ?? []) as AdminUserRow[])
   const auditLogs = await listAdminAuditLogs(adminSupabase)
+  const operationalEvents = await listOperationalEvents(adminSupabase)
 
   return (
     <AdminView
       adminEmail={user.email ?? ''}
       initialUsers={filterAdminUsersByStatus(enrichedUsers, 'all')}
       initialAuditLogs={auditLogs}
+      initialOperationalEvents={operationalEvents}
     />
   )
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProtocolAdjustmentEmail } from '@/lib/email/transactional'
+import { safeRecordOperationalEvent } from '@/lib/operational-events'
 import type { PlanType } from '@/lib/supabase/types'
 
 function jsonError(message: string, status = 400) {
@@ -95,6 +97,24 @@ export async function PATCH(request: Request) {
         dashboardUrl: new URL('/dashboard', getOrigin(request)).toString(),
       })
     : { status: 'skipped' as const, reason: 'Paciente sem e-mail encontrado.' }
+
+  if (emailDelivery.status !== 'sent') {
+    await safeRecordOperationalEvent(createAdminClient(), {
+      severity: emailDelivery.status === 'failed' ? 'critical' : 'warning',
+      area: 'email',
+      eventType: `protocol_adjustment_${emailDelivery.status}`,
+      message: emailDelivery.status === 'failed'
+        ? 'Falha ao enviar e-mail de ajuste profissional.'
+        : 'E-mail de ajuste profissional nao foi enviado.',
+      userId: patientId,
+      userEmail: patient?.email ?? null,
+      metadata: {
+        reason: emailDelivery.reason,
+        professional_id: professional.id,
+        pro_patient_id: data.id,
+      },
+    })
+  }
 
   return NextResponse.json({
     ok: true,

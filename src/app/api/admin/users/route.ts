@@ -11,6 +11,7 @@ import {
   type AdminUserRow,
 } from '@/lib/admin-users'
 import { listAdminAuditLogs, recordAdminAuditLog } from '@/lib/admin-audit'
+import { listOperationalEvents, safeRecordOperationalEvent } from '@/lib/operational-events'
 
 const VALID_PLANS = new Set<PlanType>(['free', 'pro', 'clinic'])
 
@@ -121,6 +122,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     users: filterAdminUsersByStatus(enrichedUsers, status),
     auditLogs: await listAdminAuditLogs(supabase),
+    operationalEvents: await listOperationalEvents(supabase),
   })
 }
 
@@ -157,10 +159,22 @@ export async function POST(request: NextRequest) {
         email_confirmed_at: authUser.user.email_confirmed_at,
       },
     })
+    await safeRecordOperationalEvent(supabase, {
+      severity: 'info',
+      area: 'admin',
+      eventType: 'resend_confirmation_skipped',
+      message: 'Admin tentou reenviar confirmacao para e-mail ja confirmado.',
+      userId: user.id,
+      userEmail: user.email,
+      metadata: {
+        actor_email: actor.email,
+      },
+    })
     return NextResponse.json({
       ok: true,
       message: 'Este e-mail ja esta confirmado.',
       auditLogs: await listAdminAuditLogs(supabase),
+      operationalEvents: await listOperationalEvents(supabase),
     })
   }
 
@@ -183,11 +197,23 @@ export async function POST(request: NextRequest) {
     targetEmail: user.email,
     summary: 'E-mail de confirmacao reenviado pelo admin.',
   })
+  await safeRecordOperationalEvent(supabase, {
+    severity: 'info',
+    area: 'email',
+    eventType: 'admin_resend_confirmation',
+    message: 'Admin reenviou e-mail de confirmacao.',
+    userId: user.id,
+    userEmail: user.email,
+    metadata: {
+      actor_email: actor.email,
+    },
+  })
 
   return NextResponse.json({
     ok: true,
     message: 'Confirmacao reenviada.',
     auditLogs: await listAdminAuditLogs(supabase),
+    operationalEvents: await listOperationalEvents(supabase),
   })
 }
 
@@ -268,6 +294,18 @@ export async function PATCH(request: NextRequest) {
       patch: update,
     },
   })
+  await safeRecordOperationalEvent(supabase, {
+    severity: data.plan === 'clinic' || data.is_professional ? 'warning' : 'info',
+    area: 'admin',
+    eventType: 'update_user_access',
+    message: 'Admin atualizou plano ou permissao de usuario.',
+    userId: data.id,
+    userEmail: data.email,
+    metadata: {
+      actor_email: actor.email,
+      patch: update,
+    },
+  })
 
   revalidatePath('/admin')
   revalidatePath('/dashboard')
@@ -280,5 +318,6 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({
     user: enrichedUser,
     auditLogs: await listAdminAuditLogs(supabase),
+    operationalEvents: await listOperationalEvents(supabase),
   })
 }

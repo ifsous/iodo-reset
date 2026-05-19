@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PlanType } from '@/lib/supabase/types'
 import type { AdminAuditLog } from '@/lib/admin-audit'
+import type { OperationalEvent } from '@/lib/operational-events'
 import type { AdminUser } from '@/lib/admin-users'
 
 type Patch = {
@@ -51,6 +52,18 @@ function auditLabel(action: string): string {
   return action.replaceAll('_', ' ')
 }
 
+function severityClass(severity: OperationalEvent['severity']): string {
+  if (severity === 'critical') return 'bg-red-50 text-red-800 border-red-100'
+  if (severity === 'warning') return 'bg-amber-50 text-amber-800 border-amber-100'
+  return 'bg-sky-50 text-sky-800 border-sky-100'
+}
+
+function severityLabel(severity: OperationalEvent['severity']): string {
+  if (severity === 'critical') return 'Critico'
+  if (severity === 'warning') return 'Atencao'
+  return 'Info'
+}
+
 function Toggle({ active, label, onClick, disabled }: {
   active: boolean
   label: string
@@ -76,13 +89,14 @@ function Toggle({ active, label, onClick, disabled }: {
 function Metric({ label, value, tone = 'gray' }: {
   label: string
   value: number
-  tone?: 'gray' | 'amber' | 'sky' | 'teal'
+  tone?: 'gray' | 'amber' | 'sky' | 'teal' | 'red'
 }) {
   const toneClass = {
     gray: 'bg-white text-gray-950 border-gray-200/70',
     amber: 'bg-amber-50 text-amber-950 border-amber-100',
     sky: 'bg-sky-50 text-sky-950 border-sky-100',
     teal: 'bg-teal-50 text-teal-950 border-teal-100',
+    red: 'bg-red-50 text-red-950 border-red-100',
   }[tone]
 
   return (
@@ -97,10 +111,12 @@ export default function AdminView({
   adminEmail,
   initialUsers,
   initialAuditLogs,
+  initialOperationalEvents,
 }: {
   adminEmail: string
   initialUsers: AdminUser[]
   initialAuditLogs: AdminAuditLog[]
+  initialOperationalEvents: OperationalEvent[]
 }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -108,6 +124,7 @@ export default function AdminView({
   const [statusFilter, setStatusFilter] = useState('all')
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(initialAuditLogs)
+  const [operationalEvents, setOperationalEvents] = useState<OperationalEvent[]>(initialOperationalEvents)
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -128,6 +145,7 @@ export default function AdminView({
     const result = await response.json() as {
       users?: AdminUser[]
       auditLogs?: AdminAuditLog[]
+      operationalEvents?: OperationalEvent[]
       error?: string
     }
 
@@ -139,6 +157,7 @@ export default function AdminView({
 
     setUsers(result.users ?? [])
     if (result.auditLogs) setAuditLogs(result.auditLogs)
+    if (result.operationalEvents) setOperationalEvents(result.operationalEvents)
     setLoading(false)
   }
 
@@ -155,6 +174,7 @@ export default function AdminView({
     const result = await response.json() as {
       user?: AdminUser
       auditLogs?: AdminAuditLog[]
+      operationalEvents?: OperationalEvent[]
       error?: string
     }
 
@@ -166,6 +186,7 @@ export default function AdminView({
 
     setUsers((current) => current.map((user) => user.id === userId ? result.user! : user))
     if (result.auditLogs) setAuditLogs(result.auditLogs)
+    if (result.operationalEvents) setOperationalEvents(result.operationalEvents)
     setSavingId(null)
   }
 
@@ -182,6 +203,7 @@ export default function AdminView({
     const result = await response.json() as {
       message?: string
       auditLogs?: AdminAuditLog[]
+      operationalEvents?: OperationalEvent[]
       error?: string
     }
 
@@ -193,6 +215,7 @@ export default function AdminView({
 
     setNotice(result.message ?? 'Confirmacao reenviada.')
     if (result.auditLogs) setAuditLogs(result.auditLogs)
+    if (result.operationalEvents) setOperationalEvents(result.operationalEvents)
     setActionId(null)
   }
 
@@ -201,6 +224,8 @@ export default function AdminView({
     pendingEmail: users.filter((user) => !user.email_confirmed_at).length,
     onboardingPending: users.filter((user) => !user.onboarding_done).length,
     professionals: users.filter((user) => user.is_professional).length,
+    criticalEvents: operationalEvents.filter((event) => !event.resolved_at && event.severity === 'critical').length,
+    warningEvents: operationalEvents.filter((event) => !event.resolved_at && event.severity === 'warning').length,
   }
 
   return (
@@ -227,6 +252,11 @@ export default function AdminView({
           <Metric label="E-mail pendente" value={summary.pendingEmail} tone="amber" />
           <Metric label="Onboarding pendente" value={summary.onboardingPending} tone="sky" />
           <Metric label="Profissionais" value={summary.professionals} tone="teal" />
+        </section>
+
+        <section className="grid grid-cols-2 gap-3">
+          <Metric label="Eventos criticos" value={summary.criticalEvents} tone="red" />
+          <Metric label="Alertas operacionais" value={summary.warningEvents} tone="amber" />
         </section>
 
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
@@ -378,6 +408,47 @@ export default function AdminView({
                 </article>
               )
             })
+          )}
+        </section>
+
+        <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-950">Monitoramento operacional</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Falhas recentes de e-mail, login e operacoes criticas.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadUsers()}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Atualizar
+            </button>
+          </div>
+
+          {operationalEvents.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Nenhum evento operacional registrado.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {operationalEvents.map((event) => (
+                <div key={event.id} className="py-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${severityClass(event.severity)}`}>
+                        {severityLabel(event.severity)}
+                      </span>
+                      <p className="text-sm font-medium text-gray-900">{event.message}</p>
+                    </div>
+                    <p className="text-xs text-gray-400">{formatDateTime(event.created_at)}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-400">
+                    <span>Area: {event.area}</span>
+                    <span>Tipo: {event.event_type}</span>
+                    {event.user_email && <span>Usuario: {event.user_email}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProfessionalInviteEmail } from '@/lib/email/transactional'
+import { safeRecordOperationalEvent } from '@/lib/operational-events'
 import type { PlanType } from '@/lib/supabase/types'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -163,6 +164,24 @@ export async function POST(request: Request) {
     professionalName: professional.display_name,
     acceptUrl,
   })
+
+  if (emailDelivery.status !== 'sent') {
+    await safeRecordOperationalEvent(adminSupabase, {
+      severity: emailDelivery.status === 'failed' ? 'critical' : 'warning',
+      area: 'email',
+      eventType: `professional_invite_${emailDelivery.status}`,
+      message: emailDelivery.status === 'failed'
+        ? 'Falha ao enviar convite profissional por e-mail.'
+        : 'Convite profissional nao foi enviado por falta de configuracao.',
+      userId: patient?.id ?? null,
+      userEmail: email,
+      metadata: {
+        reason: emailDelivery.reason,
+        professional_id: professional.id,
+        invite_id: invite.id,
+      },
+    })
+  }
 
   return NextResponse.json({
     ok: true,
