@@ -656,10 +656,49 @@ function InviteManagementCard({
   onInvitesChange: (invites: ProInviteSummary[]) => void
 }) {
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [selectedInviteIds, setSelectedInviteIds] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pendingInvites = invites.filter((invite) => invite.status === 'pending')
   const visibleInvites = invites.slice(0, 6)
+  const selectableInviteIds = invites
+    .filter((invite) => invite.status === 'pending' || invite.status === 'expired')
+    .map((invite) => invite.id)
+
+  function toggleInviteSelection(inviteId: string, checked: boolean) {
+    setSelectedInviteIds((current) => (
+      checked
+        ? Array.from(new Set([...current, inviteId]))
+        : current.filter((id) => id !== inviteId)
+    ))
+  }
+
+  async function cancelSelectedInvites() {
+    if (selectedInviteIds.length === 0) return
+
+    setBulkBusy(true)
+    setNotice(null)
+    setError(null)
+
+    const response = await fetch('/api/pro/invite', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invite_ids: selectedInviteIds, action: 'cancel' }),
+    })
+    const result = await response.json() as { error?: string; cancelled_ids?: string[] }
+    setBulkBusy(false)
+
+    if (!response.ok || !result.cancelled_ids) {
+      setError(result.error ?? 'Erro ao cancelar convites selecionados.')
+      return
+    }
+
+    const cancelled = new Set(result.cancelled_ids)
+    onInvitesChange(invites.filter((invite) => !cancelled.has(invite.id)))
+    setSelectedInviteIds([])
+    setNotice(`${result.cancelled_ids.length} convite${result.cancelled_ids.length === 1 ? '' : 's'} cancelado${result.cancelled_ids.length === 1 ? '' : 's'} e removido${result.cancelled_ids.length === 1 ? '' : 's'} da listagem.`)
+  }
 
   async function updateInvite(inviteId: string, action: 'resend' | 'cancel') {
     setBusyId(inviteId)
@@ -683,16 +722,21 @@ function InviteManagementCard({
       return
     }
 
-    onInvitesChange(invites.map((invite) => (
-      invite.id === inviteId
-        ? {
-            ...invite,
-            status: result.status!,
-            inviteSentAt: action === 'resend' ? new Date().toISOString() : invite.inviteSentAt,
-            updatedAt: new Date().toISOString(),
-          }
-        : invite
-    )))
+    onInvitesChange(action === 'cancel'
+      ? invites.filter((invite) => invite.id !== inviteId)
+      : invites.map((invite) => (
+          invite.id === inviteId
+            ? {
+                ...invite,
+                status: result.status!,
+                inviteSentAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+            : invite
+        )))
+    if (action === 'cancel') {
+      setSelectedInviteIds((current) => current.filter((id) => id !== inviteId))
+    }
 
     if (action === 'resend') {
       setNotice(result.email_delivery?.status === 'sent'
@@ -719,19 +763,55 @@ function InviteManagementCard({
       {notice && <p className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg p-2 mt-3">{notice}</p>}
       {error && <p className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2 mt-3">{error}</p>}
 
+      {selectableInviteIds.length > 0 && (
+        <div className="mt-3 rounded-lg border border-gray-100 bg-slate-50 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+              <input
+                type="checkbox"
+                checked={selectedInviteIds.length > 0 && selectedInviteIds.length === selectableInviteIds.length}
+                onChange={(event) => setSelectedInviteIds(event.target.checked ? selectableInviteIds : [])}
+                className="h-4 w-4 rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+              />
+              Selecionar pendentes
+            </label>
+            <button
+              type="button"
+              disabled={selectedInviteIds.length === 0 || bulkBusy}
+              onClick={() => void cancelSelectedInvites()}
+              className="rounded-lg border border-red-100 bg-white text-red-700 text-xs font-medium px-3 py-2 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {bulkBusy ? 'Cancelando...' : `Cancelar ${selectedInviteIds.length || ''}`.trim()}
+            </button>
+          </div>
+        </div>
+      )}
+
       {visibleInvites.length === 0 ? (
         <p className="text-sm text-gray-500 py-4">Nenhum convite criado ainda.</p>
       ) : (
         <div className="space-y-2 mt-3">
           {visibleInvites.map((invite) => {
             const status = INVITE_STATUS_CONFIG[invite.status]
-            const isPending = invite.status === 'pending' || invite.status === 'expired' || invite.status === 'cancelled'
+            const isPending = invite.status === 'pending' || invite.status === 'expired'
+            const selectable = invite.status === 'pending' || invite.status === 'expired'
             return (
               <div key={invite.id} className="rounded-lg border border-gray-100 bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{invite.patientEmail}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Enviado: {formatDateTime(invite.inviteSentAt)}</p>
+                  <div className="min-w-0 flex items-start gap-2">
+                    {selectable && (
+                      <input
+                        type="checkbox"
+                        checked={selectedInviteIds.includes(invite.id)}
+                        onChange={(event) => toggleInviteSelection(invite.id, event.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-teal-700 focus:ring-teal-600"
+                        aria-label={`Selecionar convite de ${invite.patientEmail}`}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{invite.patientEmail}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Enviado: {formatDateTime(invite.inviteSentAt)}</p>
+                    </div>
                   </div>
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${status.badge}`}>
                     {status.label}
@@ -781,7 +861,7 @@ export default function ProView({ data }: { data: ProData }) {
   const displayProfessionalName = professional?.displayName || data.user.fullName || 'Profissional'
   const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
   const slotsUsed = professional
-    ? `${data.patients.length + invites.filter((invite) => invite.status === 'pending' && !invite.patientId).length}/${professional.patientLimit}`
+    ? `${data.patients.length + invites.filter((invite) => invite.status === 'pending').length}/${professional.patientLimit}`
     : '0/0'
   const normalizedSearch = patientSearch.trim().toLowerCase()
   const visiblePatients = data.patients.filter((patient) => {

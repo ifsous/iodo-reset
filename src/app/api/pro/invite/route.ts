@@ -83,16 +83,15 @@ export async function POST(request: Request) {
     .from('pro_patients')
     .select('*', { count: 'exact', head: true })
     .eq('professional_id', professional.id)
-    .in('status', ['pending', 'active', 'paused'])
+    .in('status', ['active', 'paused'])
 
-  const { count: pendingEmailInvites } = await adminSupabase
+  const { count: pendingInvites } = await adminSupabase
     .from('pro_invites')
     .select('*', { count: 'exact', head: true })
     .eq('professional_id', professional.id)
     .eq('status', 'pending')
-    .is('patient_id', null)
 
-  if ((linkedCount ?? 0) + (pendingEmailInvites ?? 0) >= professional.patient_limit) {
+  if ((linkedCount ?? 0) + (pendingInvites ?? 0) >= professional.patient_limit) {
     return jsonError('Limite de pacientes do perfil profissional atingido.', 409)
   }
 
@@ -102,6 +101,10 @@ export async function POST(request: Request) {
     .eq('professional_id', professional.id)
     .eq('patient_id', patient.id)
     .maybeSingle<{ id: string; status: string }>() : { data: null }
+
+  if (existingLink && (existingLink.status === 'active' || existingLink.status === 'paused')) {
+    return jsonError('Este paciente ja aceitou o acompanhamento desta clinica.', 409)
+  }
 
   const { data: existingInvite } = await adminSupabase
     .from('pro_invites')
@@ -136,31 +139,11 @@ export async function POST(request: Request) {
 
   if (inviteError || !invite) return jsonError('Erro ao criar convite por email.', 500)
 
-  if (patient) {
-    const linkResult = existingLink
-      ? await adminSupabase
-        .from('pro_patients')
-        .update({
-          status: existingLink.status === 'active' ? 'active' : 'pending',
-          pro_notes: proNotes,
-          invite_sent_at: now,
-        })
-        .eq('id', existingLink.id)
-        .select('id, status')
-        .single()
-      : await adminSupabase
-        .from('pro_patients')
-        .insert({
-          professional_id: professional.id,
-          patient_id: patient.id,
-          status: 'pending',
-          pro_notes: proNotes,
-          invite_sent_at: now,
-        })
-        .select('id, status')
-        .single()
-
-    if (linkResult.error || !linkResult.data) return jsonError('Erro ao criar vinculo do paciente.', 500)
+  if (patient && existingLink?.status === 'pending') {
+    await adminSupabase
+      .from('pro_patients')
+      .update({ status: 'ended', updated_at: now })
+      .eq('id', existingLink.id)
   }
 
   const acceptPath = `/pro/accept?invite_id=${invite.id}`
@@ -250,12 +233,60 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({})) as {
     invite_id?: string
+    invite_ids?: string[]
     action?: 'resend' | 'cancel'
   }
   const inviteId = typeof body.invite_id === 'string' ? body.invite_id.trim() : ''
+  const inviteIds = Array.isArray(body.invite_ids)
+    ? body.invite_ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0).map((id) => id.trim())
+    : []
 
-  if (!inviteId || (body.action !== 'resend' && body.action !== 'cancel')) {
+  if ((!inviteId && inviteIds.length === 0) || (body.action !== 'resend' && body.action !== 'cancel')) {
     return jsonError('Acao de convite invalida.')
+  }
+
+  if (inviteIds.length > 0) {
+    if (body.action !== 'cancel') return jsonError('Acao em lote aceita apenas cancelamento.')
+
+    const now = new Date().toISOString()
+    const adminSupabase = createAdminClient()
+    const { data: invites, error: lookupError } = await adminSupabase
+      .from('pro_invites')
+      .select('id, patient_id')
+      .eq('professional_id', professional.id)
+      .in('id', inviteIds)
+      .neq('status', 'active')
+      .returns<{ id: string; patient_id: string | null }[]>()
+
+    if (lookupError) return jsonError('Erro ao localizar convites.', 500)
+    if (!invites || invites.length === 0) return jsonError('Nenhum convite pendente encontrado.', 404)
+
+    const idsToCancel = invites.map((invite) => invite.id)
+    const { error } = await adminSupabase
+      .from('pro_invites')
+      .update({ status: 'cancelled', updated_at: now })
+      .eq('professional_id', professional.id)
+      .in('id', idsToCancel)
+
+    if (error) return jsonError('Erro ao cancelar convites.', 500)
+
+    const patientIds = invites.map((invite) => invite.patient_id).filter((id): id is string => Boolean(id))
+    if (patientIds.length > 0) {
+      await adminSupabase
+        .from('pro_patients')
+        .update({ status: 'ended', updated_at: now })
+        .eq('professional_id', professional.id)
+        .in('patient_id', patientIds)
+        .eq('status', 'pending')
+    }
+
+    await adminSupabase
+      .from('notifications')
+      .update({ status: 'archived', updated_at: now })
+      .eq('type', 'pro_invite')
+      .in('metadata->>invite_id', idsToCancel)
+
+    return NextResponse.json({ ok: true, cancelled_ids: idsToCancel })
   }
 
   const adminSupabase = createAdminClient()
@@ -297,6 +328,13 @@ export async function PATCH(request: Request) {
         .eq('professional_id', professional.id)
         .eq('patient_id', invite.patient_id)
         .eq('status', 'pending')
+
+      await adminSupabase
+        .from('notifications')
+        .update({ status: 'archived', updated_at: now })
+        .eq('user_id', invite.patient_id)
+        .eq('type', 'pro_invite')
+        .contains('metadata', { invite_id: invite.id })
     }
 
     return NextResponse.json({ ok: true, invite_id: invite.id, status: data.status })

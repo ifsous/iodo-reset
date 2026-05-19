@@ -215,17 +215,20 @@ export default async function ProPage() {
       supabase
         .from('v_pro_dashboard')
         .select('patient_id, status, alert_level, pro_notes, patient_name, patient_email, protocol_phase, protocol_start_date, recommended_dose_drops, protocol_day, last_log_date, last_semaphore, last_energy, last_mood, last_dose_drops')
-        .eq('professional_id', professional.id),
+        .eq('professional_id', professional.id)
+        .eq('status', 'active'),
       supabase
         .from('pro_invites')
         .select('id, patient_email, patient_id, status, pro_notes, invite_sent_at, invite_accepted_at, created_at, updated_at')
         .eq('professional_id', professional.id)
+        .neq('status', 'cancelled')
         .order('updated_at', { ascending: false })
         .limit(20),
       supabase
         .from('pro_patients')
         .select('patient_id, pro_notes, updated_at')
-        .eq('professional_id', professional.id),
+        .eq('professional_id', professional.id)
+        .eq('status', 'active'),
     ])
 
     const proPatientByPatientId = new Map(

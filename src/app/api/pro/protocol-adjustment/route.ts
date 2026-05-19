@@ -77,6 +77,7 @@ export async function PATCH(request: Request) {
     .update(updatePayload)
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
+    .eq('status', 'active')
     .select('id, custom_dose_suggestion, pro_notes, updated_at')
     .single()
 

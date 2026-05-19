@@ -44,6 +44,7 @@ export async function PATCH(request: Request) {
     .update({ pro_notes: proNotes })
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
+    .eq('status', 'active')
     .select('id, pro_notes')
     .single()
 

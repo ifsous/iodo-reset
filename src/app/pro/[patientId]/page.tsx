@@ -143,6 +143,7 @@ export default async function PatientPage({
     .select('professional_id, patient_id, status, alert_level, pro_notes, patient_name, patient_email, protocol_phase, protocol_start_date, recommended_dose_drops, protocol_day, last_log_date, last_semaphore, last_energy, last_mood, last_dose_drops')
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
+    .eq('status', 'active')
     .maybeSingle<DashboardRow>()
 
   if (!patientRow) notFound()
@@ -185,6 +186,7 @@ export default async function PatientPage({
     .select('custom_dose_suggestion, pro_notes, updated_at')
     .eq('professional_id', professional.id)
     .eq('patient_id', patientId)
+    .eq('status', 'active')
     .maybeSingle<{ custom_dose_suggestion: number | null; pro_notes: string | null; updated_at: string | null }>()
 
   const mappedLogs: ProPatientSignalLog[] = (logs ?? []).map((log) => ({

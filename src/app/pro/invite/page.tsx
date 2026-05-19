@@ -46,7 +46,7 @@ export default async function InvitePage() {
     .from('pro_patients')
     .select('*', { count: 'exact', head: true })
     .eq('professional_id', professional.id)
-    .in('status', ['pending', 'active', 'paused'])
+    .in('status', ['active', 'paused'])
 
   return (
     <InviteForm
