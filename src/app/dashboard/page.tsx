@@ -6,6 +6,7 @@ import { redirect }     from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getAiLimitPolicy, getCurrentMonthStart, type AiLimitWindow } from '@/lib/ai-limits'
 import { buildPatientInsights, type PatientInsightLog, type PatientInsights } from '@/lib/protocol/patient-insights'
+import { buildPatientRetention, type PatientRetention, type PatientRetentionLog } from '@/lib/protocol/patient-retention'
 import { buildProgressHistory, type ProgressHistory, type ProgressHistoryLog } from '@/lib/protocol/progress-history'
 import { buildProgressionReadiness, type ProgressionReadiness, type ProgressionLog } from '@/lib/protocol/progression-readiness'
 import { buildTodayPlan, type TodayPlan, type TodayPlanLog } from '@/lib/protocol/today-plan'
@@ -35,6 +36,7 @@ export interface DashboardData {
   progressionReadiness: ProgressionReadiness
   progressHistory:    ProgressHistory
   patientInsights:    PatientInsights
+  patientRetention:   PatientRetention
   professionalAdjustment: {
     customDoseSuggestion: number | null
     proNotes: string | null
@@ -203,6 +205,12 @@ export default async function DashboardPage() {
   const progressionLogSignals = (recentLogs ?? []) as ProgressionLog[]
   const progressHistoryLogs = (progressLogs ?? []) as ProgressHistoryLog[]
   const patientInsightLogs = (progressLogs ?? []) as PatientInsightLog[]
+  const patientRetentionLogs = (progressLogs ?? []) as PatientRetentionLog[]
+  const nextExam = Array.isArray(profile.exam_schedule)
+    ? profile.exam_schedule.find((item): item is { label?: string; timing?: string } =>
+        item !== null && typeof item === 'object' && !Array.isArray(item)
+      ) ?? null
+    : null
   const todayPlan = buildTodayPlan({
     phase: profile.phase,
     riskLevel: profile.protocol_risk_level ?? 'standard',
@@ -230,6 +238,15 @@ export default async function DashboardPage() {
     professionalAdjustment,
     recentLogs: patientInsightLogs,
   })
+  const patientRetention = buildPatientRetention({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    protocolStartDate: profile.protocol_start_date,
+    professionalAdjustment,
+    todayLog: lastLog?.log_date === todayDate ? lastLog : null,
+    recentLogs: patientRetentionLogs,
+    nextExam,
+  })
 
   const dashboardData: DashboardData = {
     userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
@@ -250,6 +267,7 @@ export default async function DashboardPage() {
     progressionReadiness,
     progressHistory,
     patientInsights,
+    patientRetention,
     professionalAdjustment,
     lastLog:           lastLog ?? null,
     recentLogs:        (recentLogs ?? []).reverse(),

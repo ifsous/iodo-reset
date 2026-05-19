@@ -2,6 +2,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import type { DashboardData } from './page'
 import type { TimelineStepStatus, WeeklyGoalStatus } from '@/lib/protocol/patient-insights'
+import type { RetentionActionTarget, RetentionTone } from '@/lib/protocol/patient-retention'
 import type { ProgressHistoryTone } from '@/lib/protocol/progress-history'
 import type { ProgressionCriterionStatus } from '@/lib/protocol/progression-readiness'
 import type { TodayPlanStatus } from '@/lib/protocol/today-plan'
@@ -101,6 +102,174 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className="text-2xl font-semibold text-gray-900">{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+const RETENTION_TONES: Record<RetentionTone, { border: string; bg: string; text: string; dot: string; badge: string }> = {
+  good: {
+    border: 'border-emerald-100',
+    bg: 'bg-emerald-50',
+    text: 'text-emerald-800',
+    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+  },
+  watch: {
+    border: 'border-amber-100',
+    bg: 'bg-amber-50',
+    text: 'text-amber-800',
+    dot: 'bg-amber-400',
+    badge: 'bg-amber-50 text-amber-800 border-amber-100',
+  },
+  alert: {
+    border: 'border-red-100',
+    bg: 'bg-red-50',
+    text: 'text-red-800',
+    dot: 'bg-red-500',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+  },
+  neutral: {
+    border: 'border-sky-100',
+    bg: 'bg-sky-50',
+    text: 'text-sky-800',
+    dot: 'bg-sky-500',
+    badge: 'bg-sky-50 text-sky-800 border-sky-100',
+  },
+}
+
+function targetPath(target: RetentionActionTarget): string {
+  if (target === 'diary') return '/diary'
+  if (target === 'exams') return '/exams'
+  if (target === 'profile') return '/profile'
+  return '/protocol'
+}
+
+function CheckInCard({
+  data,
+  onNavigate,
+}: {
+  data: DashboardData['patientRetention']['checkIn']
+  onNavigate: (target: RetentionActionTarget) => void
+}) {
+  const tone = RETENTION_TONES[data.tone]
+
+  return (
+    <div className={`bg-white rounded-lg border ${tone.border} p-4 shadow-sm space-y-4`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500 mb-1">Check-in do dia</p>
+          <h2 className="text-lg font-semibold text-gray-900 leading-tight">{data.title}</h2>
+          <p className="text-xs text-gray-600 leading-relaxed mt-1">{data.summary}</p>
+        </div>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${tone.badge}`}>
+          {data.streakDays > 0 ? `${data.streakDays} dia${data.streakDays > 1 ? 's' : ''}` : 'Hoje'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className={`rounded-lg border ${tone.border} ${tone.bg} p-3`}>
+          <p className="text-xs text-gray-500">Sequencia</p>
+          <p className={`text-xl font-semibold mt-1 ${tone.text}`}>{data.streakDays}</p>
+          <p className="text-[11px] text-gray-500 mt-1">dias registrados seguidos</p>
+        </div>
+        <div className="rounded-lg border border-gray-100 bg-slate-50 p-3">
+          <p className="text-xs text-gray-500">Sem registrar</p>
+          <p className="text-xl font-semibold text-gray-900 mt-1">{data.missedDays > 30 ? '-' : data.missedDays}</p>
+          <p className="text-[11px] text-gray-500 mt-1">dias desde o ultimo check-in</p>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onNavigate(data.primaryAction.target)}
+        className="w-full bg-teal-800 hover:bg-teal-900 active:scale-[0.98] text-white font-medium py-3 rounded-lg text-sm transition-all shadow-sm"
+      >
+        {data.primaryAction.label}
+      </button>
+    </div>
+  )
+}
+
+function NextActionsCard({
+  actions,
+  onNavigate,
+}: {
+  actions: DashboardData['patientRetention']['nextActions']
+  onNavigate: (target: RetentionActionTarget) => void
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Proximos passos</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">O que fazer agora</h2>
+      </div>
+
+      <div className="space-y-2">
+        {actions.map((action) => (
+          <button
+            key={`${action.target}-${action.label}`}
+            type="button"
+            onClick={() => onNavigate(action.target)}
+            className={`w-full text-left rounded-lg border px-3 py-3 transition-colors ${
+              action.priority === 'primary'
+                ? 'border-teal-100 bg-teal-50 hover:bg-teal-100/70'
+                : 'border-gray-100 bg-slate-50 hover:bg-gray-100'
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{action.label}</p>
+                <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{action.detail}</p>
+              </div>
+              <span className="text-lg leading-none text-gray-300">›</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ReminderRail({
+  reminders,
+  onNavigate,
+}: {
+  reminders: DashboardData['patientRetention']['reminders']
+  onNavigate: (target: RetentionActionTarget) => void
+}) {
+  if (reminders.length === 0) return null
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
+      <div>
+        <p className="text-xs text-gray-500 mb-1">Lembretes</p>
+        <h2 className="text-base font-semibold text-gray-900 leading-tight">Nao deixar passar</h2>
+      </div>
+
+      <div className="space-y-2">
+        {reminders.map((reminder) => {
+          const tone = RETENTION_TONES[reminder.tone]
+          return (
+            <button
+              key={`${reminder.target}-${reminder.label}`}
+              type="button"
+              onClick={() => onNavigate(reminder.target)}
+              className="w-full flex items-start gap-3 rounded-lg border border-gray-100 bg-slate-50 px-3 py-2 text-left hover:bg-gray-100 transition-colors"
+            >
+              <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${tone.dot}`} />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-gray-800">{reminder.label}</span>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border whitespace-nowrap ${tone.badge}`}>
+                    {reminder.dueLabel}
+                  </span>
+                </span>
+                <span className="block text-xs text-gray-500 leading-relaxed mt-0.5">{reminder.detail}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -597,6 +766,9 @@ export default function DashboardView({ data }: { data: DashboardData }) {
   const hasChartData = data.recentLogs.length >= 2
   const riskConfig   = RISK_LABELS[data.protocolRiskLevel]
   const nextExam     = parseExamSchedule(data.examSchedule)[0]
+  const navigateRetention = (target: RetentionActionTarget) => {
+    router.push(targetPath(target))
+  }
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] pb-24">
@@ -618,6 +790,21 @@ export default function DashboardView({ data }: { data: DashboardData }) {
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-4 space-y-4">
+
+        <CheckInCard
+          data={data.patientRetention.checkIn}
+          onNavigate={navigateRetention}
+        />
+
+        <NextActionsCard
+          actions={data.patientRetention.nextActions}
+          onNavigate={navigateRetention}
+        />
+
+        <ReminderRail
+          reminders={data.patientRetention.reminders}
+          onNavigate={navigateRetention}
+        />
 
         <TodayPlanCard
           data={data.todayPlan}
