@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeRecordOperationalEvent } from '@/lib/operational-events'
+import { getAppOrigin } from '@/lib/supabase/config'
 import {
   LAST_ACTIVITY_COOKIE,
   REMEMBER_DEVICE_COOKIE,
@@ -18,17 +19,6 @@ interface AuthPayload {
   name?: string
   redirectTo?: string
   rememberDevice?: boolean
-}
-
-function getOrigin(request: NextRequest): string {
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
-
-  if (forwardedHost) {
-    return `${proto}://${forwardedHost}`
-  }
-
-  return new URL(request.url).origin
 }
 
 function safeRedirectPath(value: unknown): string {
@@ -130,7 +120,7 @@ export async function POST(request: NextRequest) {
       password,
       options: {
         data: { full_name: payload.name?.trim() ?? '' },
-        emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
+        emailRedirectTo: `${getAppOrigin()}/auth/callback?next=${next}`,
       },
     })
 
@@ -145,7 +135,7 @@ export async function POST(request: NextRequest) {
   if (action === 'reset') {
     const next = encodeURIComponent('/profile/reset-password?mode=recovery')
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
+      redirectTo: `${getAppOrigin()}/auth/callback?next=${next}`,
     })
 
     if (error) {
@@ -162,7 +152,7 @@ export async function POST(request: NextRequest) {
       type: 'signup',
       email,
       options: {
-        emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${next}`,
+        emailRedirectTo: `${getAppOrigin()}/auth/callback?next=${next}`,
       },
     })
 

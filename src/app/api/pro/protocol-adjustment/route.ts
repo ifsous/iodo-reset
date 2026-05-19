@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProtocolAdjustmentEmail } from '@/lib/email/transactional'
 import { safeRecordOperationalEvent } from '@/lib/operational-events'
+import { getAppOrigin } from '@/lib/supabase/config'
 import type { PlanType } from '@/lib/supabase/types'
 
 function jsonError(message: string, status = 400) {
@@ -14,15 +15,6 @@ function parseDose(value: unknown): number | null {
   const dose = Number(value)
   if (!Number.isInteger(dose) || dose < 0 || dose > 50) return Number.NaN
   return dose
-}
-
-function getOrigin(request: Request): string {
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
-
-  if (forwardedHost) return `${proto}://${forwardedHost}`
-
-  return new URL(request.url).origin
 }
 
 export async function PATCH(request: Request) {
@@ -105,7 +97,7 @@ export async function PATCH(request: Request) {
         professionalName: professional.display_name,
         dose: data.custom_dose_suggestion,
         notes: data.pro_notes,
-        dashboardUrl: new URL('/dashboard', getOrigin(request)).toString(),
+        dashboardUrl: new URL('/dashboard', getAppOrigin()).toString(),
       })
     : { status: 'skipped' as const, reason: 'Paciente sem e-mail encontrado.' }
 

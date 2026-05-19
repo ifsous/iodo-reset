@@ -41,3 +41,16 @@ export function getSupabaseServiceRoleKey(): string {
 
   return key
 }
+
+export function getAppOrigin(): string {
+  const configuredUrl = cleanEnvValue(process.env.NEXT_PUBLIC_APP_URL)
+  const vercelUrl = cleanEnvValue(process.env.VERCEL_PROJECT_PRODUCTION_URL)
+    || cleanEnvValue(process.env.VERCEL_URL)
+  const rawUrl = configuredUrl || (vercelUrl ? `https://${vercelUrl.replace(/^https?:\/\//, '')}` : '')
+
+  if (!rawUrl) {
+    return 'https://iodo-reset.vercel.app'
+  }
+
+  return new URL(rawUrl).origin
+}

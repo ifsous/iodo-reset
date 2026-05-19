@@ -12,6 +12,7 @@ import {
 } from '@/lib/admin-users'
 import { listAdminAuditLogs, recordAdminAuditLog } from '@/lib/admin-audit'
 import { listOperationalEvents, safeRecordOperationalEvent } from '@/lib/operational-events'
+import { getAppOrigin } from '@/lib/supabase/config'
 
 const VALID_PLANS = new Set<PlanType>(['free', 'pro', 'clinic'])
 
@@ -57,15 +58,6 @@ function cleanSearch(value: string | null): string {
     .trim()
     .replace(/[%,]/g, '')
     .slice(0, 80)
-}
-
-function getOrigin(request: NextRequest): string {
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
-
-  if (forwardedHost) return `${proto}://${forwardedHost}`
-
-  return new URL(request.url).origin
 }
 
 async function ensureProfessionalProfile(
@@ -182,7 +174,7 @@ export async function POST(request: NextRequest) {
     type: 'signup',
     email: user.email,
     options: {
-      emailRedirectTo: `${getOrigin(request)}/auth/callback?next=${encodeURIComponent('/dashboard')}`,
+      emailRedirectTo: `${getAppOrigin()}/auth/callback?next=${encodeURIComponent('/dashboard')}`,
     },
   })
 
