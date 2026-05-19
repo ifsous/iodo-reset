@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 const FEATURES = [
   {
@@ -118,7 +119,24 @@ function PhoneMockup() {
   )
 }
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const code = params?.code
+
+  if (typeof code === 'string' && code.trim()) {
+    const callbackParams = new URLSearchParams()
+    callbackParams.set('code', code)
+
+    const next = params?.next
+    callbackParams.set('next', typeof next === 'string' ? next : '/profile/reset-password?mode=recovery')
+
+    redirect(`/auth/callback?${callbackParams.toString()}`)
+  }
+
   return (
     <main className="min-h-screen bg-[#F7FAF9] text-gray-950">
       <header className="bg-teal-950 text-white">
