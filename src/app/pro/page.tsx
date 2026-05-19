@@ -28,6 +28,8 @@ export interface ProPatientSummary {
   lastEnergy: number | null
   lastMood: number | null
   lastDoseDrops: number | null
+  guidanceUpdatedAt: string | null
+  guidancePending: boolean
   triage: ProTriage
 }
 
@@ -137,6 +139,12 @@ type InviteRow = {
   updated_at: string
 }
 
+type ProPatientRow = {
+  patient_id: string
+  pro_notes: string | null
+  updated_at: string | null
+}
+
 function sortPatients(a: ProPatientSummary, b: ProPatientSummary) {
   const scoreDiff = b.triage.score - a.triage.score
   if (scoreDiff !== 0) return scoreDiff
@@ -144,6 +152,12 @@ function sortPatients(a: ProPatientSummary, b: ProPatientSummary) {
   const aDate = a.lastLogDate ?? ''
   const bDate = b.lastLogDate ?? ''
   return bDate.localeCompare(aDate)
+}
+
+function hasRespondedAfterGuidance(lastLogDate: string | null, guidanceUpdatedAt: string | null) {
+  if (!lastLogDate || !guidanceUpdatedAt) return false
+
+  return new Date(`${lastLogDate}T23:59:59`).getTime() >= new Date(guidanceUpdatedAt).getTime()
 }
 
 export default async function ProPage() {
@@ -189,7 +203,7 @@ export default async function ProPage() {
   let invites: ProInviteSummary[] = []
 
   if (professional) {
-    const [{ data: rows }, { data: inviteRows }] = await Promise.all([
+    const [{ data: rows }, { data: inviteRows }, { data: proPatientRows }] = await Promise.all([
       supabase
         .from('v_pro_dashboard')
         .select('patient_id, status, alert_level, pro_notes, patient_name, patient_email, protocol_phase, protocol_start_date, recommended_dose_drops, protocol_day, last_log_date, last_semaphore, last_energy, last_mood, last_dose_drops')
@@ -200,10 +214,26 @@ export default async function ProPage() {
         .eq('professional_id', professional.id)
         .order('updated_at', { ascending: false })
         .limit(20),
+      supabase
+        .from('pro_patients')
+        .select('patient_id, pro_notes, updated_at')
+        .eq('professional_id', professional.id),
     ])
+
+    const proPatientByPatientId = new Map(
+      ((proPatientRows ?? []) as ProPatientRow[]).map((row) => [row.patient_id, row])
+    )
 
     patients = ((rows ?? []) as DashboardRow[])
       .map((row) => {
+        const proPatient = proPatientByPatientId.get(row.patient_id)
+        const guidanceUpdatedAt = proPatient?.updated_at ?? null
+        const proNotes = proPatient?.pro_notes ?? row.pro_notes
+        const guidancePending = Boolean(
+          proNotes?.trim() &&
+          guidanceUpdatedAt &&
+          !hasRespondedAfterGuidance(row.last_log_date, guidanceUpdatedAt)
+        )
         const triage = buildProTriage({
           status: row.status,
           alertLevel: row.alert_level,
@@ -211,14 +241,15 @@ export default async function ProPage() {
           lastSemaphore: row.last_semaphore,
           lastEnergy: row.last_energy,
           lastMood: row.last_mood,
-          proNotes: row.pro_notes,
+          proNotes,
+          guidancePending,
         })
 
         return {
           patientId: row.patient_id,
           status: row.status,
           alertLevel: row.alert_level,
-          proNotes: row.pro_notes,
+          proNotes,
           patientName: row.patient_name,
           patientEmail: row.patient_email,
           protocolPhase: row.protocol_phase,
@@ -230,6 +261,8 @@ export default async function ProPage() {
           lastEnergy: row.last_energy,
           lastMood: row.last_mood,
           lastDoseDrops: row.last_dose_drops,
+          guidanceUpdatedAt,
+          guidancePending,
           triage,
         }
       })

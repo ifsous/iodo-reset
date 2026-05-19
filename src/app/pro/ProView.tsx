@@ -120,6 +120,14 @@ function formatDateTime(date: string | null) {
   })
 }
 
+function formatShortDateTime(date: string | null) {
+  if (!date) return 'Sem orientacao'
+  return new Date(date).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'short',
+  })
+}
+
 function NavBar() {
   const router = useRouter()
   const pathname = usePathname()
@@ -197,7 +205,7 @@ function ClinicalQueueSummary({ patients }: { patients: ProPatientSummary[] }) {
   const urgent = patients.filter((patient) => patient.triage.level === 'urgent').length
   const attention = patients.filter((patient) => patient.triage.level === 'attention').length
   const followUp = patients.filter((patient) => patient.triage.level === 'follow_up').length
-  const stale = patients.filter((patient) => (patient.triage.daysWithoutLog ?? 0) >= 3).length
+  const guidancePending = patients.filter((patient) => patient.guidancePending).length
 
   return (
     <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
@@ -210,7 +218,7 @@ function ClinicalQueueSummary({ patients }: { patients: ProPatientSummary[] }) {
           ['Alta', urgent, 'text-red-700'],
           ['Atencao', attention, 'text-amber-700'],
           ['Follow-up', followUp, 'text-sky-700'],
-          ['Sem check-in', stale, 'text-gray-700'],
+          ['Sem retorno', guidancePending, 'text-gray-700'],
         ].map(([label, value, color]) => (
           <div key={label} className="rounded-lg bg-slate-50 border border-gray-100 p-2 text-center">
             <p className={`text-xl font-semibold ${color}`}>{value}</p>
@@ -289,6 +297,20 @@ function PatientCard({ patient }: { patient: ProPatientSummary }) {
             <p className="text-xs font-medium text-gray-800">{patient.triage.reason}</p>
             <p className="text-xs text-gray-500 leading-relaxed mt-0.5">{patient.triage.nextAction}</p>
           </div>
+
+          {patient.guidancePending && (
+            <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-amber-900">Retorno pendente</p>
+                <span className="text-[10px] font-medium text-amber-800 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5">
+                  {formatShortDateTime(patient.guidanceUpdatedAt)}
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/80 leading-relaxed mt-0.5">
+                Paciente ainda nao registrou diario depois da ultima orientacao.
+              </p>
+            </div>
+          )}
 
           {patient.proNotes && (
             <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg p-2 mt-3 line-clamp-2">
@@ -660,8 +682,8 @@ export default function ProView({ data }: { data: ProData }) {
   const activePatients = data.patients.filter((patient) => patient.status === 'active').length
   const urgentPatients = data.patients.filter((patient) => patient.alertLevel === 'urgent').length
   const attentionPatients = data.patients.filter((patient) => patient.alertLevel === 'attention').length
-  const redToday = data.patients.filter((patient) => patient.lastSemaphore === 'red').length
   const highPriorityPatients = data.patients.filter((patient) => patient.triage.level === 'urgent').length
+  const guidancePendingPatients = data.patients.filter((patient) => patient.guidancePending).length
   const displayProfessionalName = professional?.displayName || data.user.fullName || 'Profissional'
   const planLabel = data.user.isProfessional || data.user.plan === 'clinic' ? 'Clinica' : PLAN_LABELS[data.user.plan]
   const slotsUsed = professional
@@ -705,7 +727,7 @@ export default function ProView({ data }: { data: ProData }) {
       <main className="max-w-lg mx-auto px-4 pt-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Capacidade" value={slotsUsed} sub="pacientes vinculados" />
-          <StatCard label="Prioridade alta" value={highPriorityPatients} sub={`${redToday} com semaforo vermelho`} />
+          <StatCard label="Retorno pendente" value={guidancePendingPatients} sub={`${highPriorityPatients} em prioridade alta`} />
         </div>
 
         <ClinicalQueueSummary patients={data.patients} />

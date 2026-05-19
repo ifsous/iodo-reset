@@ -10,6 +10,7 @@ export interface ProTriageInput {
   lastEnergy: number | null
   lastMood: number | null
   proNotes: string | null
+  guidancePending?: boolean
 }
 
 export interface ProTriage {
@@ -73,6 +74,11 @@ export function buildProTriage(input: ProTriageInput): ProTriage {
 
   if (input.proNotes) {
     score += 5
+  }
+
+  if (input.guidancePending) {
+    score += 30
+    reasons.push('orientacao sem retorno')
   }
 
   if (score >= 90) {
