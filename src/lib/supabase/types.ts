@@ -15,6 +15,9 @@ export type PlanType = 'free' | 'pro' | 'clinic'
 export type ProtocolPhase = '0' | '1' | '2' | '3' | '4'
 export type SemaphoreColor = 'green' | 'yellow' | 'red'
 export type AlertLevel = 'ok' | 'attention' | 'urgent'
+export type SupportFeedbackCategory = 'suggestion' | 'criticism' | 'support' | 'bug' | 'app_error'
+export type SupportFeedbackSeverity = 'low' | 'normal' | 'high' | 'critical'
+export type SupportFeedbackStatus = 'new' | 'in_review' | 'resolved' | 'closed'
 export type ProtocolRiskLevel = 'standard' | 'caution' | 'professional_only'
 export type ProgressionStrategy = 'cofactors_first' | 'slow' | 'standard' | 'supervised'
 export type SexType = 'female' | 'male' | 'other'
@@ -482,6 +485,48 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['operational_events']['Insert']>
+        Relationships: []
+      }
+      support_feedback: {
+        Row: {
+          id: string
+          user_id: string | null
+          user_email: string | null
+          category: SupportFeedbackCategory
+          severity: SupportFeedbackSeverity
+          status: SupportFeedbackStatus
+          title: string
+          message: string
+          page_url: string | null
+          user_agent: string | null
+          sentry_event_id: string | null
+          error_digest: string | null
+          metadata: Json
+          admin_notes: string | null
+          resolved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          user_email?: string | null
+          category: SupportFeedbackCategory
+          severity?: SupportFeedbackSeverity
+          status?: SupportFeedbackStatus
+          title: string
+          message: string
+          page_url?: string | null
+          user_agent?: string | null
+          sentry_event_id?: string | null
+          error_digest?: string | null
+          metadata?: Json
+          admin_notes?: string | null
+          resolved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['support_feedback']['Insert']>
         Relationships: []
       }
     }

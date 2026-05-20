@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { PlanType } from '@/lib/supabase/types'
 import type { AdminAuditLog } from '@/lib/admin-audit'
 import type { OperationalEvent } from '@/lib/operational-events'
+import type { SupportFeedback } from '@/lib/support-feedback'
 import type { AdminUser } from '@/lib/admin-users'
 
 type Patch = {
@@ -64,6 +65,35 @@ function severityLabel(severity: OperationalEvent['severity']): string {
   return 'Info'
 }
 
+function feedbackCategoryLabel(category: SupportFeedback['category']): string {
+  if (category === 'suggestion') return 'Sugestao'
+  if (category === 'criticism') return 'Critica'
+  if (category === 'support') return 'Suporte'
+  if (category === 'bug') return 'Bug'
+  return 'Erro no app'
+}
+
+function feedbackStatusLabel(status: SupportFeedback['status']): string {
+  if (status === 'new') return 'Novo'
+  if (status === 'in_review') return 'Em analise'
+  if (status === 'resolved') return 'Resolvido'
+  return 'Fechado'
+}
+
+function feedbackStatusClass(status: SupportFeedback['status']): string {
+  if (status === 'new') return 'bg-red-50 text-red-800 border-red-100'
+  if (status === 'in_review') return 'bg-amber-50 text-amber-800 border-amber-100'
+  if (status === 'resolved') return 'bg-emerald-50 text-emerald-800 border-emerald-100'
+  return 'bg-gray-50 text-gray-600 border-gray-100'
+}
+
+function supportSeverityClass(severity: SupportFeedback['severity']): string {
+  if (severity === 'critical') return 'bg-red-50 text-red-800 border-red-100'
+  if (severity === 'high') return 'bg-orange-50 text-orange-800 border-orange-100'
+  if (severity === 'low') return 'bg-gray-50 text-gray-600 border-gray-100'
+  return 'bg-sky-50 text-sky-800 border-sky-100'
+}
+
 function Toggle({ active, label, onClick, disabled }: {
   active: boolean
   label: string
@@ -112,11 +142,13 @@ export default function AdminView({
   initialUsers,
   initialAuditLogs,
   initialOperationalEvents,
+  initialSupportFeedback,
 }: {
   adminEmail: string
   initialUsers: AdminUser[]
   initialAuditLogs: AdminAuditLog[]
   initialOperationalEvents: OperationalEvent[]
+  initialSupportFeedback: SupportFeedback[]
 }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -125,6 +157,7 @@ export default function AdminView({
   const [users, setUsers] = useState<AdminUser[]>(initialUsers)
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(initialAuditLogs)
   const [operationalEvents, setOperationalEvents] = useState<OperationalEvent[]>(initialOperationalEvents)
+  const [supportFeedback, setSupportFeedback] = useState<SupportFeedback[]>(initialSupportFeedback)
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -219,6 +252,54 @@ export default function AdminView({
     setActionId(null)
   }
 
+  async function loadSupportFeedback() {
+    setError(null)
+    setNotice(null)
+
+    const response = await fetch('/api/admin/support')
+    const result = await response.json() as {
+      feedback?: SupportFeedback[]
+      error?: string
+    }
+
+    if (!response.ok) {
+      setError(result.error ?? 'Erro ao buscar feedbacks.')
+      return
+    }
+
+    setSupportFeedback(result.feedback ?? [])
+  }
+
+  async function updateSupportFeedback(feedbackId: string, status: SupportFeedback['status']) {
+    setActionId(feedbackId)
+    setError(null)
+    setNotice(null)
+
+    const response = await fetch('/api/admin/support', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedback_id: feedbackId, status }),
+    })
+    const result = await response.json() as {
+      feedback?: SupportFeedback
+      feedbackList?: SupportFeedback[]
+      error?: string
+    }
+
+    if (!response.ok) {
+      setError(result.error ?? 'Erro ao atualizar feedback.')
+      setActionId(null)
+      return
+    }
+
+    if (result.feedbackList) {
+      setSupportFeedback(result.feedbackList)
+    } else if (result.feedback) {
+      setSupportFeedback((current) => current.map((item) => item.id === feedbackId ? result.feedback! : item))
+    }
+    setActionId(null)
+  }
+
   const summary = {
     total: users.length,
     pendingEmail: users.filter((user) => !user.email_confirmed_at).length,
@@ -226,6 +307,8 @@ export default function AdminView({
     professionals: users.filter((user) => user.is_professional).length,
     criticalEvents: operationalEvents.filter((event) => !event.resolved_at && event.severity === 'critical').length,
     warningEvents: operationalEvents.filter((event) => !event.resolved_at && event.severity === 'warning').length,
+    openFeedback: supportFeedback.filter((item) => item.status === 'new' || item.status === 'in_review').length,
+    appErrors: supportFeedback.filter((item) => item.category === 'app_error' || item.category === 'bug').length,
   }
 
   return (
@@ -257,6 +340,8 @@ export default function AdminView({
         <section className="grid grid-cols-2 gap-3">
           <Metric label="Eventos criticos" value={summary.criticalEvents} tone="red" />
           <Metric label="Alertas operacionais" value={summary.warningEvents} tone="amber" />
+          <Metric label="Feedbacks abertos" value={summary.openFeedback} tone="sky" />
+          <Metric label="Bugs e erros" value={summary.appErrors} tone="red" />
         </section>
 
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
@@ -408,6 +493,75 @@ export default function AdminView({
                 </article>
               )
             })
+          )}
+        </section>
+
+        <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-950">Feedback, suporte e erros</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Sugestoes dos usuarios, criticas e relatos enviados pelo app.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadSupportFeedback()}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Atualizar
+            </button>
+          </div>
+
+          {supportFeedback.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4">Nenhum feedback registrado ainda.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {supportFeedback.map((item) => (
+                <div key={item.id} className="py-4">
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${feedbackStatusClass(item.status)}`}>
+                          {feedbackStatusLabel(item.status)}
+                        </span>
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${supportSeverityClass(item.severity)}`}>
+                          {item.severity}
+                        </span>
+                        <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-teal-50 text-teal-800 border-teal-100">
+                          {feedbackCategoryLabel(item.category)}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-950 mt-2">{item.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{item.message}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-400">
+                        <span>Data: {formatDateTime(item.created_at)}</span>
+                        {item.user_email && <span>Usuario: {item.user_email}</span>}
+                        {item.page_url && <span className="break-all">Tela: {item.page_url}</span>}
+                        {item.sentry_event_id && <span>Sentry: {item.sentry_event_id}</span>}
+                        {item.error_digest && <span>Digest: {item.error_digest}</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 lg:min-w-[280px] lg:justify-end">
+                      {(['new', 'in_review', 'resolved', 'closed'] as const).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          disabled={actionId === item.id || item.status === status}
+                          onClick={() => void updateSupportFeedback(item.id, status)}
+                          className={`px-3 py-2 rounded-lg border text-xs font-medium transition-colors disabled:opacity-60 ${
+                            item.status === status
+                              ? 'bg-teal-800 text-white border-teal-800'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {feedbackStatusLabel(status)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </section>
 
