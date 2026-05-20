@@ -94,6 +94,14 @@ const GOAL_LABELS: Record<string, string> = {
   prevencao: 'Prevencao e saude geral',
 }
 
+function parseGoals(goal: string | null): string[] {
+  if (!goal) return []
+  return goal
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 const SAFETY_LABELS: Record<string, string> = {
   pregnancy: 'Gravidez',
   breastfeeding: 'Amamentacao',
@@ -463,8 +471,8 @@ export default function ProfileView({ data }: { data: ProfileData }) {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Objetivo</p>
-              {data.profile.mainGoal ? (
-                <TagList values={[data.profile.mainGoal]} labelMap={GOAL_LABELS} tone="slate" />
+              {parseGoals(data.profile.mainGoal).length > 0 ? (
+                <TagList values={parseGoals(data.profile.mainGoal)} labelMap={GOAL_LABELS} tone="slate" />
               ) : (
                 <p className="text-sm text-gray-400">Nao informado</p>
               )}

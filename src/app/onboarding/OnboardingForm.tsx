@@ -23,7 +23,7 @@ interface FormData {
   symptoms: SymptomType[]
   // Etapa 5
   safetyFlags:       string[]
-  mainGoal:          string
+  mainGoals:         string[]
   hasProfessional:   boolean | null
 }
 
@@ -37,7 +37,7 @@ const INITIAL: FormData = {
   halogenExposure:  [],
   symptoms:         [],
   safetyFlags:      [],
-  mainGoal:         '',
+  mainGoals:        [],
   hasProfessional:  null,
 }
 
@@ -160,7 +160,7 @@ export default function OnboardingForm() {
       return false
     }
     if (step === 6) {
-      if (!data.mainGoal) { setError('Selecione seu objetivo principal.'); return false }
+      if (data.mainGoals.length === 0) { setError('Selecione pelo menos um objetivo.'); return false }
       if (data.hasProfessional === null) { setError('Responda se tem acompanhamento profissional.'); return false }
     }
     return true
@@ -209,7 +209,7 @@ export default function OnboardingForm() {
         safety_flags:           data.safetyFlags,
         has_professional_followup: data.hasProfessional ?? false,
         current_symptoms:       data.symptoms,
-        main_goal:              data.mainGoal,
+        main_goals:             data.mainGoals,
         phase:                  result.phase,
         protocol_start_date:    new Date().toISOString().split('T')[0],
         recommended_dose_drops: result.drops,
@@ -535,7 +535,7 @@ export default function OnboardingForm() {
           </div>
 
           <div>
-            <SectionLabel>Objetivo principal</SectionLabel>
+            <SectionLabel>Objetivos do protocolo</SectionLabel>
             <div className="flex flex-col gap-2">
               {[
                 { label: 'Melhorar energia e disposição',     value: 'energia'      },
@@ -544,12 +544,12 @@ export default function OnboardingForm() {
                 { label: 'Melhorar saúde reprodutiva',        value: 'reprodutiva'  },
                 { label: 'Prevenção e saúde geral',           value: 'prevencao'    },
               ].map((o) => (
-                <RadioChip
+                <CheckChip
                   key={o.value}
                   label={o.label}
                   value={o.value}
-                  selected={data.mainGoal}
-                  onChange={(v) => set('mainGoal', v)}
+                  checked={data.mainGoals.includes(o.value)}
+                  onChange={(v) => set('mainGoals', toggle(data.mainGoals, v))}
                 />
               ))}
             </div>

@@ -20,6 +20,7 @@ interface OnboardingPayload {
   protocol_alerts?: string[]
   current_symptoms?: string[]
   main_goal?: string
+  main_goals?: string[]
   phase?: ProtocolPhase
   protocol_start_date?: string
   recommended_dose_drops?: number
@@ -64,9 +65,15 @@ function normalizeSymptoms(symptoms: string[] | undefined): SymptomType[] {
   return Array.from(new Set(normalized))
 }
 
-function normalizeMainGoal(goal: string | undefined): string | null {
-  if (!goal) return null
-  return VALID_MAIN_GOALS.has(goal) ? goal : null
+function normalizeMainGoals(payload: Pick<OnboardingPayload, 'main_goal' | 'main_goals'>): string | null {
+  const rawGoals = Array.isArray(payload.main_goals)
+    ? payload.main_goals
+    : payload.main_goal
+      ? [payload.main_goal]
+      : []
+  const goals = Array.from(new Set(rawGoals.filter((goal) => VALID_MAIN_GOALS.has(goal))))
+
+  return goals.length > 0 ? goals.join(',') : null
 }
 
 function jsonError(message: string, status = 400) {
@@ -123,7 +130,7 @@ export async function POST(request: Request) {
     halogen_exposure: payload.halogen_exposure ?? [],
     has_professional_followup: payload.has_professional_followup ?? false,
     current_symptoms: normalizeSymptoms(payload.current_symptoms),
-    main_goal: normalizeMainGoal(payload.main_goal),
+    main_goal: normalizeMainGoals(payload),
     protocol_start_date: payload.protocol_start_date ?? new Date().toISOString().split('T')[0],
   }
 
