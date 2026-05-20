@@ -17,12 +17,10 @@ import type { Database } from '@/lib/supabase/types'
 
 type CookieStore = Awaited<ReturnType<typeof cookies>>
 
+const PASSWORD_RECOVERY_COOKIE = 'iodo_password_recovery'
+
 function isCookieFamily(name: string, key: string) {
   return name === key || name.startsWith(`${key}.`)
-}
-
-function hasCookieFamily(cookieStore: CookieStore, key: string) {
-  return cookieStore.getAll().some((cookie) => isCookieFamily(cookie.name, key))
 }
 
 function clearCookieFamily(cookieStore: CookieStore, key: string) {
@@ -49,12 +47,18 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const cookieStore = await cookies()
-    const persistSession = shouldPersistAuthSession(cookieStore.get(REMEMBER_DEVICE_COOKIE)?.value)
+    let persistSession = shouldPersistAuthSession(cookieStore.get(REMEMBER_DEVICE_COOKIE)?.value)
     const authStorageKey = getSupabaseAuthStorageKey()
 
-    if (isPasswordRecovery && hasCookieFamily(cookieStore, `${authStorageKey}-code-verifier`)) {
+    if (isPasswordRecovery) {
+      persistSession = false
       clearCookieFamily(cookieStore, authStorageKey)
       clearCookieFamily(cookieStore, `${authStorageKey}-user`)
+      cookieStore.set(PASSWORD_RECOVERY_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
       cookieStore.set(LAST_ACTIVITY_COOKIE, '', {
         path: '/',
         sameSite: 'lax',
@@ -90,6 +94,15 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
+      if (isPasswordRecovery) {
+        cookieStore.set(PASSWORD_RECOVERY_COOKIE, '1', {
+          path: '/',
+          sameSite: 'lax',
+          httpOnly: true,
+          maxAge: 10 * 60,
+        })
+      }
+
       if (!persistSession) {
         cookieStore.set(LAST_ACTIVITY_COOKIE, Date.now().toString(), {
           path: '/',

@@ -19,6 +19,10 @@ const ERRORS: Record<string, string> = {
 }
 
 function translateError(msg: string): string {
+  if (msg.includes('recovery_session_required')) {
+    return 'Solicite um novo link de redefinicao neste navegador.'
+  }
+
   if (msg.includes('session_expired')) {
     return 'Sua sessao expirou por inatividade. Entre novamente.'
   }

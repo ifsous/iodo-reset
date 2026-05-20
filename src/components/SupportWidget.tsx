@@ -63,15 +63,15 @@ export default function SupportWidget() {
           setError(null)
           setSuccess(null)
         }}
-        className="fixed bottom-4 right-4 z-40 rounded-full bg-teal-800 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+        className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-40 rounded-full bg-teal-800 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-teal-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
       >
         Feedback
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-gray-950/45 px-4 py-4 sm:items-center">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-3 border-b border-gray-100 p-4">
+        <div className="fixed inset-0 z-50 flex min-h-[100dvh] items-end justify-center bg-gray-950/45 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] sm:items-center sm:px-4 sm:py-4">
+          <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-md flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl sm:max-h-[calc(100vh-2rem)]">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 p-4">
               <div>
                 <h2 className="text-base font-semibold text-gray-950">Enviar ao suporte</h2>
                 <p className="mt-1 text-sm text-gray-500">Sugestoes, criticas e problemas do app.</p>
@@ -85,7 +85,7 @@ export default function SupportWidget() {
               </button>
             </div>
 
-            <form onSubmit={submit} className="space-y-4 p-4">
+            <form onSubmit={submit} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(CATEGORY_LABELS) as Category[]).map((item) => (
                   <button
