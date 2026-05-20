@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { safeRecordOperationalEvent } from '@/lib/operational-events'
-import { getAppOrigin } from '@/lib/supabase/config'
+import { getAppOrigin, getSupabaseAuthStorageKey } from '@/lib/supabase/config'
 import {
   LAST_ACTIVITY_COOKIE,
   REMEMBER_DEVICE_COOKIE,
@@ -19,6 +19,25 @@ interface AuthPayload {
   name?: string
   redirectTo?: string
   rememberDevice?: boolean
+}
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>
+
+function isCookieFamily(name: string, key: string) {
+  return name === key || name.startsWith(`${key}.`)
+}
+
+function clearCookieFamily(cookieStore: CookieStore, key: string) {
+  cookieStore
+    .getAll()
+    .filter((cookie) => isCookieFamily(cookie.name, key))
+    .forEach((cookie) => {
+      cookieStore.set(cookie.name, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+    })
 }
 
 function safeRedirectPath(value: unknown): string {
@@ -133,6 +152,21 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'reset') {
+    const authStorageKey = getSupabaseAuthStorageKey()
+
+    clearCookieFamily(cookieStore, authStorageKey)
+    clearCookieFamily(cookieStore, `${authStorageKey}-user`)
+    cookieStore.set(REMEMBER_DEVICE_COOKIE, '', {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 0,
+    })
+    cookieStore.set(LAST_ACTIVITY_COOKIE, '', {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 0,
+    })
+
     const next = encodeURIComponent('/profile/reset-password?mode=recovery')
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${getAppOrigin()}/auth/callback?next=${next}`,

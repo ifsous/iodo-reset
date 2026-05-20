@@ -6,7 +6,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSupabaseAnonKey, getSupabaseUrl } from '@/lib/supabase/config'
+import { getSupabaseAnonKey, getSupabaseAuthStorageKey, getSupabaseUrl } from '@/lib/supabase/config'
 import {
   LAST_ACTIVITY_COOKIE,
   REMEMBER_DEVICE_COOKIE,
@@ -15,17 +15,57 @@ import {
 } from '@/lib/supabase/session-cookies'
 import type { Database } from '@/lib/supabase/types'
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>
+
+function isCookieFamily(name: string, key: string) {
+  return name === key || name.startsWith(`${key}.`)
+}
+
+function hasCookieFamily(cookieStore: CookieStore, key: string) {
+  return cookieStore.getAll().some((cookie) => isCookieFamily(cookie.name, key))
+}
+
+function clearCookieFamily(cookieStore: CookieStore, key: string) {
+  cookieStore
+    .getAll()
+    .filter((cookie) => isCookieFamily(cookie.name, key))
+    .forEach((cookie) => {
+      cookieStore.set(cookie.name, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+    })
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
 
   // Parâmetros enviados pelo Supabase no redirect
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
+  const isPasswordRecovery = next.startsWith('/profile/reset-password') && next.includes('mode=recovery')
   // 'next' pode vir do redirectTo que setamos no middleware
 
   if (code) {
     const cookieStore = await cookies()
     const persistSession = shouldPersistAuthSession(cookieStore.get(REMEMBER_DEVICE_COOKIE)?.value)
+    const authStorageKey = getSupabaseAuthStorageKey()
+
+    if (isPasswordRecovery && hasCookieFamily(cookieStore, `${authStorageKey}-code-verifier`)) {
+      clearCookieFamily(cookieStore, authStorageKey)
+      clearCookieFamily(cookieStore, `${authStorageKey}-user`)
+      cookieStore.set(LAST_ACTIVITY_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+      cookieStore.set(REMEMBER_DEVICE_COOKIE, '', {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 0,
+      })
+    }
 
     const supabase = createServerClient<Database>(
       getSupabaseUrl(),

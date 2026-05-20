@@ -22,6 +22,12 @@ export function getSupabaseUrl(): string {
   return url.origin
 }
 
+export function getSupabaseAuthStorageKey(): string {
+  const hostPrefix = new URL(getSupabaseUrl()).hostname.split('.')[0]
+
+  return `sb-${hostPrefix}-auth-token`
+}
+
 export function getSupabaseAnonKey(): string {
   const key = cleanEnvValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
