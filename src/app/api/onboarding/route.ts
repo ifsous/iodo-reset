@@ -29,6 +29,7 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'headache',
   'acne',
   'extra_fatigue',
+  'hair_loss',
   'weight_gain',
   'brain_fog',
   'constipation',
@@ -39,24 +40,33 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'urinary_infection',
   'bad_breath',
   'menstrual_worsening',
+  'anxiety',
   'palpitations',
   'none',
   'other',
 ])
 
-const SYMPTOM_ALIASES: Record<string, SymptomType> = {
-  hair_loss: 'other',
-}
+const VALID_MAIN_GOALS = new Set([
+  'energia',
+  'tireoide',
+  'cistos',
+  'reprodutiva',
+  'prevencao',
+])
 
 function normalizeSymptoms(symptoms: string[] | undefined): SymptomType[] {
   const normalized = (symptoms ?? []).map((symptom) => {
-    const aliased = SYMPTOM_ALIASES[symptom] ?? symptom
-    return VALID_SYMPTOMS.has(aliased as SymptomType)
-      ? aliased as SymptomType
+    return VALID_SYMPTOMS.has(symptom as SymptomType)
+      ? symptom as SymptomType
       : 'other'
   })
 
   return Array.from(new Set(normalized))
+}
+
+function normalizeMainGoal(goal: string | undefined): string | null {
+  if (!goal) return null
+  return VALID_MAIN_GOALS.has(goal) ? goal : null
 }
 
 function jsonError(message: string, status = 400) {
@@ -113,7 +123,7 @@ export async function POST(request: Request) {
     halogen_exposure: payload.halogen_exposure ?? [],
     has_professional_followup: payload.has_professional_followup ?? false,
     current_symptoms: normalizeSymptoms(payload.current_symptoms),
-    main_goal: payload.main_goal ?? null,
+    main_goal: normalizeMainGoal(payload.main_goal),
     protocol_start_date: payload.protocol_start_date ?? new Date().toISOString().split('T')[0],
   }
 
