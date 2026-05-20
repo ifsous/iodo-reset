@@ -29,7 +29,6 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'headache',
   'acne',
   'extra_fatigue',
-  'hair_loss',
   'weight_gain',
   'brain_fog',
   'constipation',
@@ -45,12 +44,17 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'other',
 ])
 
+const SYMPTOM_ALIASES: Record<string, SymptomType> = {
+  hair_loss: 'other',
+}
+
 function normalizeSymptoms(symptoms: string[] | undefined): SymptomType[] {
-  const normalized = (symptoms ?? []).map((symptom) =>
-    VALID_SYMPTOMS.has(symptom as SymptomType)
-      ? symptom as SymptomType
+  const normalized = (symptoms ?? []).map((symptom) => {
+    const aliased = SYMPTOM_ALIASES[symptom] ?? symptom
+    return VALID_SYMPTOMS.has(aliased as SymptomType)
+      ? aliased as SymptomType
       : 'other'
-  )
+  })
 
   return Array.from(new Set(normalized))
 }
