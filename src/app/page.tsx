@@ -1,29 +1,54 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 const FEATURES = [
   {
-    title: 'Protocolo personalizado',
-    text: 'O onboarding cruza sintomas, condicoes, cofatores, medicamentos e sinais de cautela para montar uma estrategia segura.',
+    title: 'Onboarding clinico',
+    text: 'Cinco etapas para mapear sintomas, historico, medicamentos, objetivos, cautelas e ponto de partida do protocolo.',
   },
   {
     title: 'Diario com semaforo',
-    text: 'Registre dose, energia, humor, sono, sintomas e cofatores. O app mostra quando continuar, observar ou pausar.',
+    text: 'Registre dose, energia, humor, sono, sintomas e cofatores para saber quando continuar, observar ou pausar.',
   },
   {
-    title: 'Exames com IA',
-    text: 'Organize exames laboratoriais e receba interpretacoes educacionais no contexto do seu protocolo.',
+    title: 'Exames organizados',
+    text: 'Acompanhe marcadores laboratoriais, status de referencia e interpretacoes educacionais no contexto do protocolo.',
+  },
+  {
+    title: 'IA educacional',
+    text: 'Receba leituras claras sobre diario e exames, com linguagem segura e sem substituir avaliacao profissional.',
   },
   {
     title: 'Guia de cofatores',
-    text: 'Entenda o papel de selenio, magnesio, vitamina C, vitaminas B, D3 + K2, agua e sal integral.',
+    text: 'Veja selenio, magnesio, vitamina C, B2/B3, hidratacao e sal integral dentro de uma rotina acompanhavel.',
+  },
+  {
+    title: 'Perfil profissional',
+    text: 'Profissionais podem acompanhar pacientes, enviar notas e visualizar progresso com mais contexto clinico.',
   },
 ]
 
+const OUTCOMES = [
+  'Menos achismo na evolucao da dose',
+  'Mais clareza sobre sintomas e cofatores',
+  'Historico pronto para conversar com profissionais',
+  'Protocolos individualizados por cautela e objetivo',
+]
+
 const STEPS = [
-  'Responda ao onboarding clinico em poucos minutos.',
-  'Receba fase, dose inicial, estrategia e alertas personalizados.',
-  'Acompanhe diariamente sua resposta com diario, exames e IA.',
+  {
+    title: 'Configure o perfil',
+    text: 'O paciente informa sintomas, objetivo, condicoes, medicamentos, exames e sinais de atencao.',
+  },
+  {
+    title: 'Receba uma rota inicial',
+    text: 'O app organiza fase, dose, cofatores e alertas para iniciar com mais prudencia.',
+  },
+  {
+    title: 'Acompanhe a resposta',
+    text: 'Diario, exames, IA e semaforo ajudam a entender a evolucao real ao longo dos dias.',
+  },
 ]
 
 const FAQ = [
@@ -44,72 +69,90 @@ const FAQ = [
 function CheckIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path d="M3 8.2L6.4 11.5L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3 8.2L6.4 11.5L13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
 
-function PhoneMockup() {
+function ArrowIcon() {
   return (
-    <div className="relative mx-auto w-full max-w-[330px]">
-      <div className="absolute -inset-5 rounded-[2rem] bg-teal-200/30 blur-2xl" />
-      <div className="relative rounded-[2rem] border border-white/20 bg-gray-950 p-2 shadow-2xl">
-        <div className="rounded-[1.5rem] bg-[#F7FAF9] overflow-hidden">
-          <div className="bg-teal-800 px-5 pt-8 pb-5">
-            <p className="text-xs text-teal-100/80">Hoje no protocolo</p>
-            <div className="mt-2 flex items-center justify-between">
-              <div>
-                <p className="text-white text-xl font-semibold">Fase 1</p>
-                <p className="text-teal-100/80 text-xs">4 gotas - 25.0mg</p>
-              </div>
-              <span className="text-xs font-medium bg-white/10 border border-white/10 text-teal-50 px-2.5 py-1 rounded-full">
-                Conservador
-              </span>
-            </div>
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+      <path d="M3.5 8.5h9M9.5 4.5l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ProductPanel() {
+  return (
+    <div className="relative mx-auto w-full max-w-[620px]">
+      <div className="absolute -inset-6 rounded-[2rem] bg-cyan-200/35 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-[#F7FBFC] px-5 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full bg-rose-300" />
+            <span className="h-3 w-3 rounded-full bg-amber-300" />
+            <span className="h-3 w-3 rounded-full bg-emerald-300" />
           </div>
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            Semaforo verde
+          </span>
+        </div>
 
-          <div className="p-4 space-y-3">
-            <div className="bg-white rounded-lg border border-gray-200/70 p-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Continuar protocolo</p>
-                  <p className="text-xs text-gray-500">Tudo certo com os dados de hoje.</p>
-                </div>
+        <div className="grid gap-0 md:grid-cols-[0.78fr_1.22fr]">
+          <aside className="border-b border-slate-100 bg-[#F1FAF9] p-5 md:border-b-0 md:border-r">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-teal-700">Hoje</p>
+            <h3 className="mt-2 text-2xl font-semibold text-slate-950">Fase 1</h3>
+            <p className="mt-1 text-sm text-slate-600">4 gotas - 25.0mg</p>
+
+            <div className="mt-5 rounded-xl border border-teal-100 bg-white p-4">
+              <p className="text-xs font-semibold text-slate-500">Protocolo atual</p>
+              <div className="mt-3 space-y-3">
+                {[
+                  ['Dose', '25.0mg'],
+                  ['Dias', '12'],
+                  ['Cofatores', '5/6'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-semibold text-slate-950">{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
+          </aside>
 
-            <div className="grid grid-cols-3 gap-2">
+          <div className="p-5">
+            <div className="grid grid-cols-3 gap-3">
               {[
                 ['Energia', '8'],
                 ['Humor', '7'],
                 ['Sono', '8'],
               ].map(([label, value]) => (
-                <div key={label} className="bg-white border border-gray-200/70 rounded-lg p-3">
-                  <p className="text-[11px] text-gray-500">{label}</p>
-                  <p className="text-xl font-semibold text-gray-950">{value}</p>
+                <div key={label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-950">{value}</p>
                 </div>
               ))}
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200/70 p-3 shadow-sm">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">IA educacional</p>
-              <p className="text-xs text-gray-700 leading-relaxed mt-2">
+            <div className="mt-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <p className="text-sm font-semibold text-slate-950">Continuar protocolo</p>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 Sua tolerancia esta boa. Mantenha cofatores e observe sintomas antes de qualquer progressao.
               </p>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200/70 p-3 shadow-sm">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cofatores</p>
-              <div className="mt-2 space-y-1.5">
-                {['Selenio', 'Magnesio', 'Vitamina C'].map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-xs text-gray-700">
-                    <span className="w-4 h-4 rounded bg-teal-50 border border-teal-100 text-teal-800 flex items-center justify-center">
-                      <CheckIcon />
-                    </span>
-                    {item}
-                  </div>
-                ))}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-100 bg-[#F8FCFC] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">IA educacional</p>
+                <p className="mt-2 text-sm text-slate-700">Analise do diario e exames no contexto do protocolo.</p>
+              </div>
+              <div className="rounded-xl border border-slate-100 bg-[#F8FCFC] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Exames</p>
+                <p className="mt-2 text-sm text-slate-700">18 marcadores para acompanhar com historico.</p>
               </div>
             </div>
           </div>
@@ -138,154 +181,228 @@ export default async function HomePage({
   }
 
   return (
-    <main className="min-h-screen bg-[#F7FAF9] text-gray-950">
-      <header className="bg-teal-950 text-white">
-        <nav className="max-w-6xl mx-auto px-5 py-5 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-lg bg-teal-500 flex items-center justify-center font-bold">IR</span>
-            <span className="font-semibold tracking-tight">IODO RESET</span>
+    <main className="min-h-screen bg-white text-slate-950">
+      <div className="border-b border-slate-100 bg-[#F7FBFC]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-2 text-sm">
+          <div className="flex items-center gap-2 text-slate-700">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <CheckIcon />
+            </span>
+            <span>Plataforma educacional com privacidade, seguranca e dados organizados</span>
+          </div>
+          <Link href="/login" className="hidden font-semibold text-teal-800 hover:text-teal-950 sm:inline">
+            Entrar no app
           </Link>
+        </div>
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-700 font-bold text-white">IR</span>
+            <span className="font-semibold tracking-tight text-slate-950">IODO RESET</span>
+          </Link>
+          <div className="hidden items-center gap-8 text-sm font-semibold text-slate-700 md:flex">
+            <a href="#funcionalidades" className="hover:text-teal-800">Funcionalidades</a>
+            <a href="#framework" className="hover:text-teal-800">Framework</a>
+            <a href="#profissionais" className="hover:text-teal-800">Profissionais</a>
+            <a href="#faq" className="hover:text-teal-800">FAQ</a>
+          </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-teal-50/80 hover:text-white transition-colors">
+            <Link href="/login" className="hidden text-sm font-semibold text-slate-700 hover:text-teal-800 sm:inline">
               Entrar
             </Link>
-            <Link href="/login?mode=signup" className="text-sm font-medium bg-white text-teal-950 px-4 py-2 rounded-lg hover:bg-teal-50 transition-colors">
-              Comecar
+            <Link href="/login?mode=signup" className="inline-flex items-center justify-center rounded-lg border border-teal-700 px-4 py-2 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-50">
+              Comecar gratis
             </Link>
           </div>
         </nav>
+      </header>
 
-        <section className="max-w-6xl mx-auto px-5 pt-8 pb-12 md:pt-16 md:pb-20 grid md:grid-cols-[1.05fr_0.95fr] gap-10 items-center">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#F3FBFD] via-white to-[#EAF8F4]">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-14 md:grid-cols-[0.95fr_1.05fr] md:py-20">
           <div>
-            <p className="text-sm font-medium text-teal-200 mb-4">Aplicativo mobile-first para protocolos de iodo</p>
-            <h1 className="text-4xl md:text-6xl font-semibold tracking-tight leading-[1.02] max-w-3xl">
-              Transforme um protocolo confuso em uma rotina clara, segura e acompanhavel.
-            </h1>
-            <p className="text-base md:text-lg text-teal-50/78 leading-relaxed mt-6 max-w-2xl">
-              O IODO RESET organiza dose, sintomas, cofatores, exames e interpretacoes educacionais com IA para voce acompanhar sua resposta dia apos dia.
+            <p className="inline-flex border-b-2 border-amber-400 pb-1 text-base font-semibold text-teal-800">
+              App para protocolo de iodo assistido por dados
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
-              <Link href="/login?mode=signup" className="inline-flex items-center justify-center bg-teal-400 text-teal-950 font-semibold px-6 py-4 rounded-lg hover:bg-teal-300 transition-colors">
-                Criar minha conta
+            <h1 className="mt-5 max-w-3xl text-5xl font-semibold leading-[1.03] tracking-tight text-[#1970C8] md:text-6xl">
+              Suplementacao de iodo com mais clareza, rotina e acompanhamento.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-700">
+              O IODO RESET organiza perfil clinico, dose, cofatores, sintomas, exames e IA educacional em uma experiencia simples para pacientes e profissionais.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link href="/login?mode=signup" className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-400 px-6 py-4 font-semibold text-slate-950 shadow-lg shadow-amber-300/30 transition-colors hover:bg-amber-300">
+                Quero comecar gratuitamente
+                <ArrowIcon />
               </Link>
-              <Link href="/login" className="inline-flex items-center justify-center border border-white/20 text-white font-medium px-6 py-4 rounded-lg hover:bg-white/10 transition-colors">
+              <Link href="/login" className="inline-flex items-center justify-center rounded-lg px-6 py-4 font-semibold text-teal-800 transition-colors hover:bg-teal-50">
                 Ja tenho acesso
               </Link>
             </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {['Sem achismo diario', 'Com cofatores', 'Com exames', 'Com IA educacional'].map((item) => (
-                <span key={item} className="text-xs font-medium text-teal-50 bg-white/10 border border-white/10 px-3 py-1.5 rounded-full">
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              {OUTCOMES.map((item) => (
+                <div key={item} className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-emerald-50 text-emerald-700">
+                    <CheckIcon />
+                  </span>
                   {item}
-                </span>
+                </div>
               ))}
             </div>
           </div>
 
-          <PhoneMockup />
-        </section>
-      </header>
+          <ProductPanel />
+        </div>
+      </section>
 
-      <section className="max-w-6xl mx-auto px-5 py-12 md:py-16">
-        <div className="grid md:grid-cols-3 gap-4">
+      <section className="relative z-10 -mt-4 px-5 md:-mt-10">
+        <div className="mx-auto grid max-w-6xl gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-200/60 md:grid-cols-3">
           {[
             ['6', 'analises de IA no plano gratuito'],
             ['5', 'etapas de onboarding clinico'],
             ['18', 'tipos de exames para acompanhar'],
           ].map(([value, label]) => (
-            <div key={label} className="bg-white border border-gray-200/70 rounded-lg p-5 shadow-sm">
-              <p className="text-3xl font-semibold text-teal-900">{value}</p>
-              <p className="text-sm text-gray-600 mt-1">{label}</p>
+            <div key={label} className="rounded-xl bg-[#F7FBFC] p-5">
+              <p className="text-4xl font-semibold text-teal-800">{value}</p>
+              <p className="mt-1 text-sm text-slate-600">{label}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="bg-white border-y border-gray-200/70">
-        <div className="max-w-6xl mx-auto px-5 py-14 md:py-20 grid md:grid-cols-[0.9fr_1.1fr] gap-10">
+      <section id="funcionalidades" className="mx-auto max-w-7xl px-5 py-16 md:py-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Funcionalidades</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+            Tudo que o paciente precisa para acompanhar o protocolo em um so lugar.
+          </h2>
+        </div>
+        <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((feature) => (
+            <article key={feature.title} className="group rounded-xl bg-[#2386D9] p-6 text-white shadow-lg shadow-blue-100 transition-transform hover:-translate-y-1">
+              <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-lg bg-white/15 text-white">
+                <CheckIcon />
+              </div>
+              <h3 className="text-xl font-semibold">{feature.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-white/86">{feature.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="framework" className="border-y border-slate-100 bg-[#F7FBFC]">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 lg:grid-cols-[0.82fr_1.18fr] lg:py-24">
           <div>
-            <p className="text-sm font-medium text-teal-800">Por que existe</p>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mt-3">
-              O problema nao e apenas lembrar da dose. E saber o que seus dados estao dizendo.
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Framework do protocolo</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 md:text-5xl">
+              Uma jornada personalizada para cada necessidade do paciente.
+            </h2>
+            <p className="mt-5 text-lg leading-relaxed text-slate-650">
+              Em vez de seguir uma dose isolada, o app cruza seguranca, perfil clinico, exames, exposicao a halogenios, cofatores e sintomas diarios para orientar uma evolucao mais consciente.
+            </p>
+
+            <div className="mt-8 space-y-3">
+              {[
+                ['Cansaco e nevoa mental', 'Energia, sono, humor e cofatores antes de sugerir evolucao.'],
+                ['Tireoide e autoimunidade', 'Triagem, exames, cautela e acompanhamento profissional.'],
+                ['Reacoes iniciais', 'Hidratacao, sal, pausa, reducao e reavaliacao quando necessario.'],
+                ['Manutencao', 'Alimentacao, exposicao ambiental, dose estavel e historico.'],
+              ].map(([title, text]) => (
+                <div key={title} className="flex gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-700 text-white">
+                    <CheckIcon />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold text-slate-950">{title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <figure className="relative mx-auto w-full max-w-[610px] overflow-hidden rounded-2xl border border-cyan-100 bg-white p-2 shadow-2xl shadow-cyan-100/80">
+            <Image
+              src="/iodo-reset-framework.png"
+              alt="Framework IODO RESET com sete etapas: triagem, perfil, exames, halogenios, cofatores, fase e monitoramento."
+              width={1080}
+              height={1920}
+              sizes="(max-width: 1024px) 100vw, 610px"
+              className="h-auto w-full rounded-xl"
+            />
+          </figure>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-16 md:py-24">
+        <div className="grid items-start gap-10 lg:grid-cols-[0.7fr_1.3fr]">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Como funciona</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
+              Da primeira resposta ao acompanhamento diario.
             </h2>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {FEATURES.map((feature) => (
-              <article key={feature.title} className="border border-gray-200/70 rounded-lg p-5">
-                <div className="w-9 h-9 rounded-lg bg-teal-50 text-teal-800 flex items-center justify-center mb-4">
-                  <CheckIcon />
-                </div>
-                <h3 className="text-base font-semibold text-gray-950">{feature.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed mt-2">{feature.text}</p>
+          <div className="grid gap-5 md:grid-cols-3">
+            {STEPS.map((step, index) => (
+              <article key={step.title} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-700 text-sm font-semibold text-white">
+                  {index + 1}
+                </span>
+                <h3 className="mt-6 text-lg font-semibold text-slate-950">{step.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{step.text}</p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-5 py-14 md:py-20">
-        <div className="max-w-2xl">
-          <p className="text-sm font-medium text-teal-800">Como funciona</p>
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mt-3">
-            Do cadastro ao acompanhamento em tres passos.
-          </h2>
-        </div>
-        <div className="grid md:grid-cols-3 gap-4 mt-8">
-          {STEPS.map((step, index) => (
-            <div key={step} className="bg-white border border-gray-200/70 rounded-lg p-5 shadow-sm">
-              <span className="w-8 h-8 rounded-lg bg-teal-800 text-white flex items-center justify-center text-sm font-semibold">
-                {index + 1}
-              </span>
-              <p className="text-sm text-gray-700 leading-relaxed mt-4">{step}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="bg-teal-950 text-white">
-        <div className="max-w-6xl mx-auto px-5 py-14 md:py-20 grid md:grid-cols-[1fr_0.85fr] gap-10 items-center">
+      <section id="profissionais" className="bg-[#0D6F68] text-white">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-5 py-16 md:grid-cols-[1fr_0.82fr] md:py-20">
           <div>
-            <p className="text-sm font-medium text-teal-200">Para usuarios e profissionais</p>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mt-3">
-              Um painel para acompanhar o que costuma ficar espalhado em notas, conversas e planilhas.
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-cyan-100">Pacientes e profissionais</p>
+            <h2 className="mt-3 text-4xl font-semibold tracking-tight md:text-5xl">
+              Mais contexto para acompanhar, orientar e evoluir com prudencia.
             </h2>
-            <p className="text-teal-50/78 leading-relaxed mt-4">
-              Diario, exames, IA, perfil clinico e alertas ficam no mesmo lugar. O resultado e mais clareza para evoluir com prudencia.
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/78">
+              O IODO RESET centraliza dados que costumam ficar espalhados em conversas, planilhas e anotacoes. O resultado e uma rotina mais clara para o paciente e uma leitura mais objetiva para o profissional.
             </p>
           </div>
-          <div className="bg-white text-gray-950 rounded-lg p-5 shadow-xl">
-            <p className="text-sm font-semibold text-gray-950">Comece gratuito</p>
-            <p className="text-sm text-gray-600 mt-2">
-              Crie sua conta, configure seu protocolo e use as primeiras analises de IA sem compromisso.
+          <div className="rounded-2xl bg-white p-6 text-slate-950 shadow-2xl">
+            <p className="text-sm font-semibold text-teal-800">Comece gratuito</p>
+            <h3 className="mt-2 text-2xl font-semibold">Monte seu protocolo e teste a experiencia.</h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              O app e educacional e nao substitui avaliacao medica. Use como sistema de organizacao, acompanhamento e conversa mais qualificada com profissionais.
             </p>
-            <Link href="/login?mode=signup" className="mt-5 inline-flex w-full items-center justify-center bg-teal-800 text-white font-semibold px-5 py-3 rounded-lg hover:bg-teal-900 transition-colors">
+            <Link href="/login?mode=signup" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-5 py-4 font-semibold text-slate-950 transition-colors hover:bg-amber-300">
               Acessar o app
+              <ArrowIcon />
             </Link>
-            <p className="text-xs text-gray-400 mt-3 text-center">Conteudo educacional. Nao substitui orientacao medica.</p>
           </div>
         </div>
       </section>
 
-      <section className="max-w-4xl mx-auto px-5 py-14 md:py-20">
-        <div className="text-center mb-8">
-          <p className="text-sm font-medium text-teal-800">Perguntas frequentes</p>
-          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mt-3">Antes de comecar</h2>
+      <section id="faq" className="mx-auto max-w-4xl px-5 py-16 md:py-24">
+        <div className="mb-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-teal-700">Perguntas frequentes</p>
+          <h2 className="mt-3 text-4xl font-semibold tracking-tight">Antes de comecar</h2>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {FAQ.map((item) => (
-            <article key={item.q} className="bg-white border border-gray-200/70 rounded-lg p-5 shadow-sm">
-              <h3 className="text-base font-semibold text-gray-950">{item.q}</h3>
-              <p className="text-sm text-gray-600 leading-relaxed mt-2">{item.a}</p>
+            <article key={item.q} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-950">{item.q}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{item.a}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <footer className="border-t border-gray-200/70 bg-white">
-        <div className="max-w-6xl mx-auto px-5 py-8 flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <p className="text-sm text-gray-500">IODO RESET - protocolo educacional assistido por dados</p>
+      <footer className="border-t border-slate-100 bg-[#F7FBFC]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-500">IODO RESET - protocolo educacional assistido por dados</p>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm text-gray-600 hover:text-teal-800 transition-colors">Entrar</Link>
-            <Link href="/login?mode=signup" className="text-sm font-medium text-teal-800 hover:text-teal-950 transition-colors">Criar conta</Link>
+            <Link href="/login" className="text-sm font-semibold text-slate-600 hover:text-teal-800">Entrar</Link>
+            <Link href="/login?mode=signup" className="text-sm font-semibold text-teal-800 hover:text-teal-950">Criar conta</Link>
           </div>
         </div>
       </footer>
