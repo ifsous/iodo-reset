@@ -28,6 +28,16 @@ export interface ExistingLog {
   semaphore:     SemaphoreColor
 }
 
+type DiaryUserData = {
+  onboarding_done: boolean
+  full_name: string | null
+}
+
+type DiaryProfile = {
+  recommended_dose_drops: number
+  phase: string
+}
+
 export default async function DiaryPage() {
   const supabase = await createClient()
 
@@ -35,29 +45,32 @@ export default async function DiaryPage() {
   if (!user) redirect('/login')
 
   // Verifica onboarding
-  const { data: userData } = await supabase
+  const { data: rawUserData } = await supabase
     .from('users')
     .select('onboarding_done, full_name')
     .eq('id', user.id)
-    .single<{ onboarding_done: boolean; full_name: string | null }>()
+    .single()
+  const userData = rawUserData as DiaryUserData | null
 
   if (!userData?.onboarding_done) redirect('/onboarding')
 
   // Busca dose recomendada do perfil
-  const { data: profile } = await supabase
+  const { data: rawProfile } = await supabase
     .from('profiles')
     .select('recommended_dose_drops, phase')
     .eq('user_id', user.id)
-    .single<{ recommended_dose_drops: number; phase: string }>()
+    .single()
+  const profile = rawProfile as DiaryProfile | null
 
   // Busca registro de hoje (se existir)
   const today = new Date().toISOString().split('T')[0]
-  const { data: existing } = await supabase
+  const { data: rawExisting } = await supabase
     .from('daily_logs')
     .select('id, dose_drops, energy, mood, sleep_quality, symptoms, took_iodine, took_selenium, took_magnesium, took_vitamins, took_vitamin_c, drank_water, used_salt, notes, semaphore')
     .eq('user_id', user.id)
     .eq('log_date', today)
-    .maybeSingle<ExistingLog>()
+    .maybeSingle()
+  const existing = rawExisting as ExistingLog | null
 
   return (
     <DiaryForm
