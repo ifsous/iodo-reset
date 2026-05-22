@@ -125,11 +125,12 @@ export async function proxy(request: NextRequest) {
   // (exceto o próprio onboarding) → /onboarding
   if (user && isProtected && !pathname.startsWith('/onboarding') && !pathname.startsWith('/pro/accept')) {
     // Busca se o usuário já completou o onboarding
-    const { data: userData } = await supabase
+    const { data: rawUserData } = await supabase
       .from('users')
       .select('onboarding_done')
       .eq('id', user.id)
-      .single<{ onboarding_done: boolean }>()
+      .single()
+    const userData = rawUserData as { onboarding_done: boolean } | null
 
     if (userData && !userData.onboarding_done) {
       const redirectUrl = request.nextUrl.clone()
