@@ -15,6 +15,8 @@ const ERRORS: Record<string, string> = {
   'Email rate limit exceeded':            'Muitas tentativas. Aguarde alguns minutos.',
   'Password should be at least 6':        'A senha deve ter pelo menos 6 caracteres.',
   'For security purposes':               'Aguarde alguns segundos e tente novamente.',
+  'Database error saving new user':       'Não foi possível criar seu perfil agora. Verifique a configuração do cadastro no Supabase e tente novamente.',
+  'Signups not allowed for this instance': 'O cadastro está desativado neste projeto Supabase.',
   'auth_callback_error':                  'Link inválido ou expirado. Tente novamente.',
 }
 
@@ -30,7 +32,7 @@ function translateError(msg: string): string {
   for (const [key, value] of Object.entries(ERRORS)) {
     if (msg.includes(key)) return value
   }
-  return 'Ocorreu um erro inesperado. Tente novamente.'
+  return `Ocorreu um erro inesperado: ${msg}`
 }
 
 export default function LoginForm() {
@@ -80,7 +82,7 @@ export default function LoginForm() {
     return response.ok ? null : result.error ?? 'auth_request_failed'
   }
 
-  // ── Login ──────────────────────────────────────────────────
+  // ── Login ─────────────────────────────────────────────────
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
@@ -372,7 +374,7 @@ export default function LoginForm() {
   )
 }
 
-// ── Primitivos reutilizáveis ───────────────────────────────────
+// ── Primitivos reutilizáveis ─────────────────────────────────
 
 interface FieldProps {
   label: string
