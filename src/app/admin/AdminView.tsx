@@ -158,6 +158,9 @@ export default function AdminView({
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(initialAuditLogs)
   const [operationalEvents, setOperationalEvents] = useState<OperationalEvent[]>(initialOperationalEvents)
   const [supportFeedback, setSupportFeedback] = useState<SupportFeedback[]>(initialSupportFeedback)
+  const [supportStatusFilter, setSupportStatusFilter] = useState<SupportFeedback['status'] | 'all' | 'open'>('open')
+  const [supportCategoryFilter, setSupportCategoryFilter] = useState<SupportFeedback['category'] | 'all'>('all')
+  const [supportNoteDrafts, setSupportNoteDrafts] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
@@ -270,7 +273,10 @@ export default function AdminView({
     setSupportFeedback(result.feedback ?? [])
   }
 
-  async function updateSupportFeedback(feedbackId: string, status: SupportFeedback['status']) {
+  async function updateSupportFeedback(
+    feedbackId: string,
+    patch: { status?: SupportFeedback['status']; admin_notes?: string }
+  ) {
     setActionId(feedbackId)
     setError(null)
     setNotice(null)
@@ -278,7 +284,7 @@ export default function AdminView({
     const response = await fetch('/api/admin/support', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedback_id: feedbackId, status }),
+      body: JSON.stringify({ feedback_id: feedbackId, ...patch }),
     })
     const result = await response.json() as {
       feedback?: SupportFeedback
@@ -297,8 +303,21 @@ export default function AdminView({
     } else if (result.feedback) {
       setSupportFeedback((current) => current.map((item) => item.id === feedbackId ? result.feedback! : item))
     }
+    if (patch.admin_notes !== undefined) {
+      setNotice('Nota interna salva.')
+    }
     setActionId(null)
   }
+
+  const filteredSupportFeedback = supportFeedback.filter((item) => {
+    const statusMatches =
+      supportStatusFilter === 'all' ||
+      (supportStatusFilter === 'open' && (item.status === 'new' || item.status === 'in_review')) ||
+      item.status === supportStatusFilter
+    const categoryMatches = supportCategoryFilter === 'all' || item.category === supportCategoryFilter
+
+    return statusMatches && categoryMatches
+  })
 
   const summary = {
     total: users.length,
@@ -333,7 +352,7 @@ export default function AdminView({
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <Metric label="Usuarios" value={summary.total} />
           <Metric label="E-mail pendente" value={summary.pendingEmail} tone="amber" />
-          <Metric label="Onboarding pendente" value={summary.onboardingPending} tone="sky" />
+          <Metric label="Triagem pendente" value={summary.onboardingPending} tone="sky" />
           <Metric label="Profissionais" value={summary.professionals} tone="teal" />
         </section>
 
@@ -376,7 +395,7 @@ export default function AdminView({
               <option value="all">Todos status</option>
               <option value="pending_email">E-mail pendente</option>
               <option value="confirmed">E-mail confirmado</option>
-              <option value="onboarding_pending">Onboarding pendente</option>
+              <option value="onboarding_pending">Triagem pendente</option>
               <option value="professional">Profissionais</option>
             </select>
             <button
@@ -438,7 +457,7 @@ export default function AdminView({
                         <span>Cadastro: {formatDate(user.created_at)}</span>
                         <span>Confirmacao: {formatDate(user.email_confirmed_at)}</span>
                         <span>Ultimo login: {formatDateTime(user.last_sign_in_at)}</span>
-                        <span>Onboarding: {user.onboarding_done ? 'sim' : 'nao'}</span>
+                        <span>Triagem: {user.onboarding_done ? 'sim' : 'nao'}</span>
                         <span>Plano desde: {formatDate(user.plan_started_at)}</span>
                       </div>
                     </div>
@@ -469,7 +488,7 @@ export default function AdminView({
                             onClick={() => void updateUser(user.id, { is_professional: !user.is_professional })}
                           />
                           <Toggle
-                            label="Onboarding concluido"
+                            label="Triagem concluida"
                             active={user.onboarding_done}
                             disabled={saving}
                             onClick={() => void updateUser(user.id, { onboarding_done: !user.onboarding_done })}
@@ -497,25 +516,51 @@ export default function AdminView({
         </section>
 
         <section className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex flex-col gap-3 mb-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h2 className="text-sm font-semibold text-gray-950">Feedback, suporte e erros</h2>
               <p className="text-xs text-gray-500 mt-0.5">Sugestoes dos usuarios, criticas e relatos enviados pelo app.</p>
             </div>
-            <button
-              type="button"
-              onClick={() => void loadSupportFeedback()}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Atualizar
-            </button>
+            <div className="grid gap-2 sm:grid-cols-[150px_170px_auto]">
+              <select
+                value={supportStatusFilter}
+                onChange={(event) => setSupportStatusFilter(event.target.value as SupportFeedback['status'] | 'all' | 'open')}
+                className="rounded-lg border border-gray-200 bg-white text-gray-950 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+              >
+                <option value="open">Abertos</option>
+                <option value="all">Todos status</option>
+                <option value="new">Novo</option>
+                <option value="in_review">Em analise</option>
+                <option value="resolved">Resolvido</option>
+                <option value="closed">Fechado</option>
+              </select>
+              <select
+                value={supportCategoryFilter}
+                onChange={(event) => setSupportCategoryFilter(event.target.value as SupportFeedback['category'] | 'all')}
+                className="rounded-lg border border-gray-200 bg-white text-gray-950 px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+              >
+                <option value="all">Todos tipos</option>
+                <option value="suggestion">Sugestoes</option>
+                <option value="criticism">Criticas</option>
+                <option value="support">Suporte</option>
+                <option value="bug">Bugs</option>
+                <option value="app_error">Erros no app</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void loadSupportFeedback()}
+                className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Atualizar
+              </button>
+            </div>
           </div>
 
-          {supportFeedback.length === 0 ? (
+          {filteredSupportFeedback.length === 0 ? (
             <p className="text-sm text-gray-500 py-4">Nenhum feedback registrado ainda.</p>
           ) : (
             <div className="divide-y divide-gray-100">
-              {supportFeedback.map((item) => (
+              {filteredSupportFeedback.map((item) => (
                 <div key={item.id} className="py-4">
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
                     <div className="min-w-0">
@@ -539,6 +584,32 @@ export default function AdminView({
                         {item.sentry_event_id && <span>Sentry: {item.sentry_event_id}</span>}
                         {item.error_digest && <span>Digest: {item.error_digest}</span>}
                       </div>
+                      <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <label className="block">
+                          <span className="text-xs font-medium text-gray-500">Nota interna do suporte</span>
+                          <textarea
+                            value={supportNoteDrafts[item.id] ?? item.admin_notes ?? ''}
+                            onChange={(event) => setSupportNoteDrafts((current) => ({
+                              ...current,
+                              [item.id]: event.target.value,
+                            }))}
+                            rows={3}
+                            maxLength={1000}
+                            placeholder="Adicione contexto, decisao ou proxima acao."
+                            className="mt-2 w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-950 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={actionId === item.id}
+                          onClick={() => void updateSupportFeedback(item.id, {
+                            admin_notes: supportNoteDrafts[item.id] ?? item.admin_notes ?? '',
+                          })}
+                          className="mt-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          {actionId === item.id ? 'Salvando...' : 'Salvar nota'}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2 lg:min-w-[280px] lg:justify-end">
@@ -547,7 +618,7 @@ export default function AdminView({
                           key={status}
                           type="button"
                           disabled={actionId === item.id || item.status === status}
-                          onClick={() => void updateSupportFeedback(item.id, status)}
+                          onClick={() => void updateSupportFeedback(item.id, { status })}
                           className={`px-3 py-2 rounded-lg border text-xs font-medium transition-colors disabled:opacity-60 ${
                             item.status === status
                               ? 'bg-teal-800 text-white border-teal-800'
