@@ -6,6 +6,7 @@ import type { TimelineStepStatus, WeeklyGoalStatus } from '@/lib/protocol/patien
 import type { RetentionActionTarget, RetentionTone } from '@/lib/protocol/patient-retention'
 import type { ProgressHistoryTone } from '@/lib/protocol/progress-history'
 import type { ProgressionCriterionStatus } from '@/lib/protocol/progression-readiness'
+import type { PatientNeedTone, ProtocolStepStatus } from '@/lib/protocol/protocol-intelligence'
 import type { TodayPlanStatus } from '@/lib/protocol/today-plan'
 import type { Json, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor } from '@/lib/supabase/types'
 import AnalysisCard from '@/components/AnalysisCard'
@@ -655,6 +656,120 @@ function DoseExplanationCard({ data }: { data: DashboardData['patientInsights'][
   )
 }
 
+const NEED_TONES: Record<PatientNeedTone, string> = {
+  safety: 'bg-red-50 text-red-800 border-red-100',
+  foundation: 'bg-teal-50 text-teal-800 border-teal-100',
+  metabolic: 'bg-sky-50 text-sky-800 border-sky-100',
+  detox: 'bg-amber-50 text-amber-800 border-amber-100',
+  monitoring: 'bg-indigo-50 text-indigo-800 border-indigo-100',
+  maintenance: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+}
+
+const STEP_STYLES: Record<ProtocolStepStatus, { dot: string; badge: string; label: string; row: string }> = {
+  done: {
+    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+    label: 'feito',
+    row: 'bg-emerald-50/40 border-emerald-100',
+  },
+  current: {
+    dot: 'bg-teal-700',
+    badge: 'bg-teal-50 text-teal-800 border-teal-100',
+    label: 'agora',
+    row: 'bg-teal-50 border-teal-100',
+  },
+  next: {
+    dot: 'bg-sky-500',
+    badge: 'bg-sky-50 text-sky-800 border-sky-100',
+    label: 'proximo',
+    row: 'bg-slate-50 border-gray-100',
+  },
+  blocked: {
+    dot: 'bg-red-500',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    label: 'bloqueado',
+    row: 'bg-red-50/50 border-red-100',
+  },
+}
+
+function ProtocolIntelligenceCard({
+  data,
+  riskLabel,
+  strategyLabel,
+  onOpenProtocol,
+}: {
+  data: DashboardData['protocolIntelligence']
+  riskLabel: string
+  strategyLabel: string
+  onOpenProtocol: () => void
+}) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">Inteligencia do protocolo</p>
+          <h2 className="text-base font-semibold text-gray-900 leading-tight">{data.currentStage.label}</h2>
+          <p className="text-xs text-gray-600 leading-relaxed mt-1">{data.currentStage.detail}</p>
+        </div>
+        <span className="text-xs font-medium px-2.5 py-1 rounded-full border bg-slate-50 text-slate-700 border-slate-200 whitespace-nowrap">
+          {strategyLabel}
+        </span>
+      </div>
+
+      <div className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-3">
+        <p className="text-sm font-medium text-teal-900">{data.nextBestAction}</p>
+        <p className="text-xs text-teal-800/80 leading-relaxed mt-1">{data.summary}</p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Necessidades detectadas</p>
+        <div className="grid gap-2">
+          {data.needs.map((need) => (
+            <div key={need.key} className={`rounded-lg border px-3 py-2 ${NEED_TONES[need.tone]}`}>
+              <p className="text-xs font-semibold">{need.title}</p>
+              <p className="text-xs leading-relaxed mt-0.5 opacity-85">{need.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Framework em 5 etapas</p>
+          <span className="text-[10px] text-gray-400">{riskLabel}</span>
+        </div>
+        {data.steps.map((step) => {
+          const style = STEP_STYLES[step.status]
+          return (
+            <div key={step.number} className={`rounded-lg border px-3 py-2 ${style.row}`}>
+              <div className="flex items-start gap-3">
+                <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${style.dot}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-gray-900">{step.number}. {step.title}</p>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${style.badge}`}>
+                      {style.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed mt-1">{step.patientAction}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpenProtocol}
+        className="w-full rounded-lg border border-teal-200 text-teal-800 text-sm font-medium py-3 hover:bg-teal-50 transition-colors"
+      >
+        Ver explicacao completa
+      </button>
+    </div>
+  )
+}
+
 function ProfessionalAdjustmentCard({ data }: { data: NonNullable<DashboardData['professionalAdjustment']> }) {
   const professionalName = data.professionalName ?? 'Seu profissional'
   const hasDoseSuggestion = data.customDoseSuggestion !== null && data.customDoseSuggestion !== undefined
@@ -1021,41 +1136,20 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           <SemaphoreIndicator color={semaphore} />
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Inteligencia do protocolo</p>
-              <p className="text-xs text-gray-500 mt-1">{STRATEGY_LABELS[data.progressionStrategy]}</p>
-            </div>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${riskConfig.tone}`}>
-              {riskConfig.label}
-            </span>
+        <ProtocolIntelligenceCard
+          data={data.protocolIntelligence}
+          riskLabel={riskConfig.label}
+          strategyLabel={STRATEGY_LABELS[data.progressionStrategy]}
+          onOpenProtocol={() => router.push('/protocol')}
+        />
+
+        {nextExam && (
+          <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Proximo monitoramento</p>
+            <p className="text-sm text-gray-800 mt-1">{nextExam.label ?? 'Exame sugerido'}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{nextExam.timing ?? 'Conforme acompanhamento'}</p>
           </div>
-          <p className="text-xs text-gray-600 leading-relaxed">{riskConfig.note}</p>
-          {data.protocolAlerts.length > 0 && (
-            <div className="space-y-2">
-              {data.protocolAlerts.slice(0, 2).map((alert) => (
-                <div key={alert} className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                  <p className="text-xs text-amber-800 leading-relaxed">{alert}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          {nextExam && (
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Proximo monitoramento</p>
-              <p className="text-sm text-gray-800 mt-1">{nextExam.label ?? 'Exame sugerido'}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{nextExam.timing ?? 'Conforme acompanhamento'}</p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => router.push('/protocol')}
-            className="w-full rounded-lg border border-teal-200 text-teal-800 text-sm font-medium py-3 hover:bg-teal-50 transition-colors"
-          >
-            Ver guia do protocolo
-          </button>
-        </div>
+        )}
 
         {/* Métricas */}
         <div className="grid grid-cols-2 gap-3">

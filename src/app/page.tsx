@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 
 const FEATURES = [
   {
-    title: 'Onboarding clinico',
+    title: 'Triagem clinica',
     text: 'Cinco etapas para mapear sintomas, historico, medicamentos, objetivos, cautelas e ponto de partida do protocolo.',
   },
   {
@@ -260,7 +260,7 @@ export default async function HomePage({
         <div className="mx-auto grid max-w-6xl gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl shadow-slate-200/60 md:grid-cols-3">
           {[
             ['6', 'analises de IA no plano gratuito'],
-            ['5', 'etapas de onboarding clinico'],
+            ['5', 'etapas de triagem clinica'],
             ['18', 'tipos de exames para acompanhar'],
           ].map(([value, label]) => (
             <div key={label} className="rounded-xl bg-[#F7FBFC] p-5">

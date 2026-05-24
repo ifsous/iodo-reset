@@ -36,6 +36,7 @@ const VALID_SYMPTOMS = new Set<SymptomType>([
   'constipation',
   'dry_skin',
   'cold_intolerance',
+  'no_sweat',
   'breast_pain',
   'rhinitis',
   'urinary_infection',

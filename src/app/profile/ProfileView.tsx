@@ -75,6 +75,7 @@ const SYMPTOM_LABELS: Record<SymptomType, string> = {
   constipation: 'Intestino lento',
   dry_skin: 'Pele seca',
   cold_intolerance: 'Sensacao de frio',
+  no_sweat: 'Quase nao suo',
   breast_pain: 'Dor nos seios',
   rhinitis: 'Rinite',
   urinary_infection: 'Infeccao urinaria',
@@ -432,6 +433,18 @@ export default function ProfileView({ data }: { data: ProfileData }) {
               ))}
             </div>
           )}
+          <div className="pt-3">
+            <button
+              type="button"
+              onClick={() => router.push('/onboarding?mode=retake')}
+              className="w-full py-3 rounded-lg border border-teal-200 text-sm font-medium text-teal-800 hover:bg-teal-50 transition-all"
+            >
+              Refazer Triagem Clinica
+            </button>
+            <p className="text-xs text-gray-400 leading-relaxed mt-2">
+              Recalcula fase, dose, cautelas e exames mantendo diario, exames e historico da conta.
+            </p>
+          </div>
         </Card>
 
         <Card title="Dados pessoais">

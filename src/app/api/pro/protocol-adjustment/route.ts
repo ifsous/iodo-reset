@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProtocolAdjustmentEmail } from '@/lib/email/transactional'
 import { safeRecordOperationalEvent } from '@/lib/operational-events'
 import { getAppOrigin } from '@/lib/supabase/config'
-import type { PlanType } from '@/lib/supabase/types'
+import type { Json, PlanType, ProtocolPhase } from '@/lib/supabase/types'
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
@@ -17,6 +17,11 @@ function parseDose(value: unknown): number | null {
   return dose
 }
 
+function parsePhase(value: unknown): ProtocolPhase | null {
+  if (value === null || value === undefined || value === '') return null
+  return ['0', '1', '2', '3', '4'].includes(String(value)) ? String(value) as ProtocolPhase : null
+}
+
 export async function PATCH(request: Request) {
   const supabase = await createClient()
 
@@ -26,6 +31,7 @@ export async function PATCH(request: Request) {
   const body = await request.json() as {
     patient_id?: string
     custom_dose_suggestion?: number | string | null
+    phase?: ProtocolPhase | string | null
     pro_notes?: string | null
   }
 
@@ -36,6 +42,11 @@ export async function PATCH(request: Request) {
   const customDoseSuggestion = shouldUpdateDose ? parseDose(body.custom_dose_suggestion) : null
   if (Number.isNaN(customDoseSuggestion)) {
     return jsonError('Dose sugerida deve ser um numero inteiro entre 0 e 50 gotas.')
+  }
+  const shouldUpdatePhase = Object.prototype.hasOwnProperty.call(body, 'phase')
+  const phaseSuggestion = shouldUpdatePhase ? parsePhase(body.phase) : null
+  if (shouldUpdatePhase && !phaseSuggestion) {
+    return jsonError('Fase sugerida invalida.')
   }
 
   const proNotes = typeof body.pro_notes === 'string'
@@ -85,9 +96,83 @@ export async function PATCH(request: Request) {
     return jsonError('Paciente nao encontrado para este profissional.', 404)
   }
 
+  const admin = createAdminClient()
+  const { data: previousProfile } = await admin
+    .from('profiles')
+    .select('phase, recommended_dose_drops')
+    .eq('user_id', patientId)
+    .maybeSingle<{ phase: ProtocolPhase; recommended_dose_drops: number }>()
+
+  const profileUpdate: {
+    phase?: ProtocolPhase
+    recommended_dose_drops?: number
+    updated_at: string
+  } = { updated_at: new Date().toISOString() }
+
+  if (shouldUpdatePhase && phaseSuggestion) {
+    profileUpdate.phase = phaseSuggestion
+  }
+
+  if (shouldUpdateDose && customDoseSuggestion !== null) {
+    profileUpdate.recommended_dose_drops = customDoseSuggestion
+  }
+
+  const shouldUpdateProfile = Boolean(profileUpdate.phase || profileUpdate.recommended_dose_drops !== undefined)
+
+  if (shouldUpdateProfile && previousProfile) {
+    const { error: profileError } = await admin
+      .from('profiles')
+      .update(profileUpdate)
+      .eq('user_id', patientId)
+
+    if (profileError) {
+      return jsonError('Ajuste salvo no vinculo, mas nao foi possivel atualizar o perfil do paciente.', 500)
+    }
+
+    const nextPhase = profileUpdate.phase ?? previousProfile.phase
+    const nextDose = profileUpdate.recommended_dose_drops ?? previousProfile.recommended_dose_drops
+
+    await Promise.all([
+      admin
+        .from('protocol_progression_events')
+        .insert({
+          user_id: patientId,
+          source: 'professional',
+          actor_user_id: user.id,
+          from_phase: previousProfile.phase,
+          to_phase: nextPhase,
+          from_dose_drops: previousProfile.recommended_dose_drops,
+          to_dose_drops: nextDose,
+          reason: 'Ajuste manual enviado por profissional vinculado ao paciente.',
+          metadata: {
+            professional_id: professional.id,
+            pro_patient_id: data.id,
+            has_notes: Boolean(proNotes),
+          } as Json,
+        }),
+      admin
+        .from('notifications')
+        .insert({
+          user_id: patientId,
+          type: 'protocol_update',
+          title: 'Ajuste profissional recebido',
+          body: `Seu profissional atualizou seu protocolo para fase ${nextPhase} e ${nextDose} gota${nextDose === 1 ? '' : 's'}.`,
+          action_url: '/dashboard',
+          metadata: {
+            source: 'professional',
+            professional_id: professional.id,
+            from_phase: previousProfile.phase,
+            to_phase: nextPhase,
+            from_dose_drops: previousProfile.recommended_dose_drops,
+            to_dose_drops: nextDose,
+          },
+        }),
+    ])
+  }
+
   const guidanceMessage = proNotes?.trim()
   if (guidanceMessage) {
-    const { error: guidanceError } = await createAdminClient()
+    const { error: guidanceError } = await admin
       .from('pro_guidance_history')
       .insert({
         professional_id: professional.id,
@@ -133,7 +218,7 @@ export async function PATCH(request: Request) {
     : { status: 'skipped' as const, reason: 'Paciente sem e-mail encontrado.' }
 
   if (emailDelivery.status !== 'sent') {
-    await safeRecordOperationalEvent(createAdminClient(), {
+    await safeRecordOperationalEvent(admin, {
       severity: emailDelivery.status === 'failed' ? 'critical' : 'warning',
       area: 'email',
       eventType: `protocol_adjustment_${emailDelivery.status}`,
@@ -153,6 +238,7 @@ export async function PATCH(request: Request) {
   return NextResponse.json({
     ok: true,
     custom_dose_suggestion: data.custom_dose_suggestion,
+    phase: phaseSuggestion ?? previousProfile?.phase ?? null,
     pro_notes: data.pro_notes,
     guidance_updated_at: data.updated_at,
     email_delivery: emailDelivery,

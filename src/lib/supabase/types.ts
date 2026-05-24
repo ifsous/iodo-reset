@@ -31,6 +31,7 @@ export type SymptomType =
   | 'constipation'
   | 'dry_skin'
   | 'cold_intolerance'
+  | 'no_sweat'
   | 'breast_pain'
   | 'rhinitis'
   | 'urinary_infection'
@@ -147,6 +148,7 @@ export interface Database {
           protocol_start_date?: string | null
           recommended_dose_drops?: number
           pro_notes?: string | null
+          updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
         Relationships: []
@@ -397,6 +399,36 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['pro_guidance_history']['Insert']>
+        Relationships: []
+      }
+      protocol_progression_events: {
+        Row: {
+          id: string
+          user_id: string
+          source: 'auto' | 'professional'
+          actor_user_id: string | null
+          from_phase: ProtocolPhase
+          to_phase: ProtocolPhase
+          from_dose_drops: number
+          to_dose_drops: number
+          reason: string
+          metadata: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source: 'auto' | 'professional'
+          actor_user_id?: string | null
+          from_phase: ProtocolPhase
+          to_phase: ProtocolPhase
+          from_dose_drops: number
+          to_dose_drops: number
+          reason: string
+          metadata?: Json
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['protocol_progression_events']['Insert']>
         Relationships: []
       }
       notifications: {

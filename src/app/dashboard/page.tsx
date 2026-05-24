@@ -9,6 +9,7 @@ import { buildPatientInsights, type PatientInsightLog, type PatientInsights } fr
 import { buildPatientRetention, type PatientRetention, type PatientRetentionLog } from '@/lib/protocol/patient-retention'
 import { buildProgressHistory, type ProgressHistory, type ProgressHistoryLog } from '@/lib/protocol/progress-history'
 import { buildProgressionReadiness, type ProgressionReadiness, type ProgressionLog } from '@/lib/protocol/progression-readiness'
+import { buildProtocolIntelligence, type ProtocolIntelligence } from '@/lib/protocol/protocol-intelligence'
 import { buildTodayPlan, type TodayPlan, type TodayPlanLog } from '@/lib/protocol/today-plan'
 import DashboardView    from './DashboardView'
 import type { Json, PlanType, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SemaphoreColor, SymptomType } from '@/lib/supabase/types'
@@ -37,6 +38,7 @@ export interface DashboardData {
   progressHistory:    ProgressHistory
   patientInsights:    PatientInsights
   patientRetention:   PatientRetention
+  protocolIntelligence: ProtocolIntelligence
   notifications: {
     id: string
     type: 'pro_invite' | 'protocol_update' | 'message' | 'system'
@@ -77,6 +79,11 @@ type DashboardProfile = {
   recommended_dose_drops: number
   protocol_start_date: string | null
   conditions: string[]
+  medications: string[]
+  current_symptoms: SymptomType[]
+  cofactors_in_use: string[]
+  safety_flags: string[]
+  halogen_exposure: string[]
   protocol_risk_level: ProtocolRiskLevel
   progression_strategy: ProgressionStrategy
   protocol_alerts: string[]
@@ -153,7 +160,7 @@ export default async function DashboardPage() {
   // Busca perfil clínico
   const { data: rawProfile } = await supabase
     .from('profiles')
-    .select('phase, recommended_dose_drops, protocol_start_date, conditions, protocol_risk_level, progression_strategy, protocol_alerts, exam_schedule')
+    .select('phase, recommended_dose_drops, protocol_start_date, conditions, medications, current_symptoms, cofactors_in_use, safety_flags, halogen_exposure, protocol_risk_level, progression_strategy, protocol_alerts, exam_schedule')
     .eq('user_id', user.id)
     .single()
   const profile = rawProfile as DashboardProfile | null
@@ -328,6 +335,30 @@ export default async function DashboardPage() {
     recentLogs: patientRetentionLogs,
     nextExam,
   })
+  const recentSignalWindow = recentLogSignals.slice(0, 7)
+  const protocolIntelligence = buildProtocolIntelligence({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    recommendedDrops: profile.recommended_dose_drops,
+    conditions: profile.conditions ?? [],
+    symptoms: profile.current_symptoms ?? [],
+    medications: profile.medications ?? [],
+    cofactorsInUse: profile.cofactors_in_use ?? [],
+    safetyFlags: profile.safety_flags ?? [],
+    halogenExposure: profile.halogen_exposure ?? [],
+    protocolAlerts: profile.protocol_alerts ?? [],
+    recentSignals: {
+      redDays: recentSignalWindow.filter((log) => log.semaphore === 'red').length,
+      yellowDays: recentSignalWindow.filter((log) => log.semaphore === 'yellow').length,
+      hasPalpitations: recentSignalWindow.some((log) => log.symptoms.includes('palpitations')),
+      cofactorReadyDays: recentSignalWindow.filter((log) =>
+        [log.took_selenium, log.took_magnesium, log.took_vitamins, log.took_vitamin_c, log.drank_water && log.used_salt]
+          .filter(Boolean).length >= 4
+      ).length,
+      loggedDays: recentSignalWindow.length,
+    },
+  })
 
   const dashboardData: DashboardData = {
     userName:          userData?.full_name?.split(' ')[0] ?? 'Usuário',
@@ -349,6 +380,7 @@ export default async function DashboardPage() {
     progressHistory,
     patientInsights,
     patientRetention,
+    protocolIntelligence,
     notifications: (notificationRows ?? []).map((notification) => ({
       id: notification.id,
       type: notification.type,

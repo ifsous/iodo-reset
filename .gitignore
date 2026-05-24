@@ -38,6 +38,7 @@ yarn-error.log*
 .env*
 .env.sentry-build-plugin
 dev-server.log
+supabase/.temp/
 
 # vercel
 .vercel

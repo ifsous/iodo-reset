@@ -103,6 +103,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
   const historyRef = useRef<HTMLElement | null>(null)
   const [notes, setNotes] = useState(patient.proNotes ?? '')
   const [customDose, setCustomDose] = useState(patient.customDoseSuggestion?.toString() ?? '')
+  const [targetPhase, setTargetPhase] = useState<ProtocolPhase>(patient.phase ?? '0')
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
   const [notesSaved, setNotesSaved] = useState(false)
@@ -165,6 +166,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
       body: JSON.stringify({
         patient_id: patient.id,
         custom_dose_suggestion: customDose.trim() === '' ? null : customDose,
+        phase: targetPhase,
         pro_notes: notes,
       }),
     })
@@ -172,6 +174,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
     const result = await response.json() as {
       error?: string
       custom_dose_suggestion?: number | null
+      phase?: ProtocolPhase | null
       pro_notes?: string | null
     }
     setSavingNotes(false)
@@ -183,6 +186,7 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
 
     setNotes(result.pro_notes ?? '')
     setCustomDose(result.custom_dose_suggestion?.toString() ?? '')
+    if (result.phase) setTargetPhase(result.phase)
     setNotesSaved(true)
     router.refresh()
   }
@@ -514,7 +518,25 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
 
         <section ref={adjustmentRef}>
         <Card title="Ajuste profissional">
-          <div className="grid grid-cols-[1fr_auto] gap-3 mb-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-medium text-gray-600" htmlFor="target-phase">
+                Fase do protocolo
+              </label>
+              <select
+                id="target-phase"
+                value={targetPhase}
+                onChange={(event) => {
+                  setTargetPhase(event.target.value as ProtocolPhase)
+                  setNotesSaved(false)
+                }}
+                className="mt-1 w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
+              >
+                {Object.entries(PHASE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="text-xs font-medium text-gray-600" htmlFor="custom-dose">
                 Dose sugerida
@@ -534,8 +556,14 @@ export default function PatientView({ data }: { data: PatientDetailData }) {
                 className="mt-1 w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-950 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600"
               />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="self-end rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 min-w-24">
-              <p className="text-[11px] text-gray-400">Atual</p>
+              <p className="text-[11px] text-gray-400">Fase atual</p>
+              <p className="text-sm font-semibold text-gray-900">{phase}</p>
+            </div>
+            <div className="self-end rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 min-w-24">
+              <p className="text-[11px] text-gray-400">Dose atual</p>
               <p className="text-sm font-semibold text-gray-900">{patient.recommendedDoseDrops ?? '-'} gotas</p>
             </div>
           </div>

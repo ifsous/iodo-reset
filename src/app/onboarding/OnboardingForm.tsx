@@ -25,6 +25,7 @@ interface FormData {
   safetyFlags:       string[]
   mainGoals:         string[]
   hasProfessional:   boolean | null
+  protocolStartDate: string | null
 }
 
 const INITIAL: FormData = {
@@ -39,6 +40,7 @@ const INITIAL: FormData = {
   safetyFlags:      [],
   mainGoals:        [],
   hasProfessional:  null,
+  protocolStartDate: null,
 }
 
 const TOTAL_STEPS = 6
@@ -114,11 +116,31 @@ function ErrorMsg({ msg }: { msg: string | null }) {
 }
 
 // ── Componente principal ──────────────────────────────────────
-export default function OnboardingForm() {
+export type OnboardingInitialData = Partial<FormData>
+
+export default function OnboardingForm({
+  initialData,
+  isRetake = false,
+}: {
+  initialData?: OnboardingInitialData | null
+  isRetake?: boolean
+}) {
   const router  = useRouter()
 
   const [step,    setStep]    = useState(1)
-  const [data,    setData]    = useState<FormData>(INITIAL)
+  const [data,    setData]    = useState<FormData>({
+    ...INITIAL,
+    ...initialData,
+    birthYear: initialData?.birthYear ?? INITIAL.birthYear,
+    sex: initialData?.sex ?? INITIAL.sex,
+    conditions: initialData?.conditions ?? INITIAL.conditions,
+    medications: initialData?.medications ?? INITIAL.medications,
+    cofactorsInUse: initialData?.cofactorsInUse ?? INITIAL.cofactorsInUse,
+    halogenExposure: initialData?.halogenExposure ?? INITIAL.halogenExposure,
+    symptoms: initialData?.symptoms ?? INITIAL.symptoms,
+    safetyFlags: initialData?.safetyFlags ?? INITIAL.safetyFlags,
+    mainGoals: initialData?.mainGoals ?? INITIAL.mainGoals,
+  })
   const [error,   setError]   = useState<string | null>(null)
   const [saving,  setSaving]  = useState(false)
   const [result,  setResult]  = useState<PhaseResult | null>(null)
@@ -211,7 +233,7 @@ export default function OnboardingForm() {
         current_symptoms:       data.symptoms,
         main_goals:             data.mainGoals,
         phase:                  result.phase,
-        protocol_start_date:    new Date().toISOString().split('T')[0],
+        protocol_start_date:    data.protocolStartDate ?? new Date().toISOString().split('T')[0],
         recommended_dose_drops: result.drops,
       }),
     })
@@ -230,6 +252,14 @@ export default function OnboardingForm() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8">
+      {isRetake && (
+        <div className="mb-5 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2">
+          <p className="text-xs font-medium text-teal-900">Refazendo Triagem Clinica</p>
+          <p className="text-xs text-teal-800/80 leading-relaxed mt-0.5">
+            Seus dados atuais foram carregados. Ao finalizar, o app recalcula fase, dose, cautelas e exames sem apagar diario ou exames ja registrados.
+          </p>
+        </div>
+      )}
 
       {/* Barra de progresso */}
       <div className="mb-8">
@@ -420,6 +450,7 @@ export default function OnboardingForm() {
               { label: 'Intestino lento',             value: 'constipation'         },
               { label: 'Pele seca',                   value: 'dry_skin'             },
               { label: 'Sensação de frio',            value: 'cold_intolerance'     },
+              { label: 'Quase não suo',               value: 'no_sweat'             },
               { label: 'Dor nos seios',               value: 'breast_pain'          },
               { label: 'Ciclo irregular',             value: 'menstrual_worsening'  },
               { label: 'Ansiedade / irritabilidade',  value: 'anxiety'              },
@@ -677,7 +708,7 @@ export default function OnboardingForm() {
                 </svg>
                 Salvando...
               </span>
-            ) : 'Iniciar meu protocolo'}
+            ) : isRetake ? 'Atualizar Triagem Clinica' : 'Iniciar meu protocolo'}
           </button>
         )}
       </div>

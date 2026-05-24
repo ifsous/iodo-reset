@@ -29,6 +29,7 @@ const SYMPTOMS: { value: SymptomType; label: string }[] = [
   { value: 'headache',            label: 'Dor de cabeça'     },
   { value: 'acne',                label: 'Acne / espinhas'   },
   { value: 'extra_fatigue',       label: 'Cansaço extra'     },
+  { value: 'no_sweat',            label: 'Quase não suei'    },
   { value: 'breast_pain',         label: 'Dor nos seios'     },
   { value: 'rhinitis',            label: 'Rinite / catarro'  },
   { value: 'urinary_infection',   label: 'Infecção urinária' },
@@ -122,6 +123,14 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
 
   function toggleCheck(key: CheckKey) { setChecks((c) => ({ ...c, [key]: !c[key] })) }
 
+  async function syncProtocolProgression(): Promise<void> {
+    try {
+      await fetch('/api/protocol/progression', { method: 'POST' })
+    } catch {
+      // A progressao e recalculada no proximo registro se a sincronizacao falhar.
+    }
+  }
+
   async function handleSave() {
     setSaving(true)
     setError(null)
@@ -164,6 +173,8 @@ export default function DiaryForm({ userId, recommendedDrops, existing, today }:
     }
 
     if (dbError) { setError('Erro ao salvar. Tente novamente.'); setSaving(false); return }
+
+    await syncProtocolProgression()
     router.push('/dashboard')
     router.refresh()
   }

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import type { Json, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel } from '@/lib/supabase/types'
+import { buildProtocolIntelligence, type PatientNeedTone, type ProtocolStepStatus } from '@/lib/protocol/protocol-intelligence'
+import type { Json, ProgressionStrategy, ProtocolPhase, ProtocolRiskLevel, SymptomType } from '@/lib/supabase/types'
 
 export const metadata = {
   title: 'Guia do protocolo - IODO RESET',
@@ -141,6 +142,8 @@ type ProfileRow = {
   phase: ProtocolPhase
   recommended_dose_drops: number
   conditions: string[]
+  medications: string[]
+  current_symptoms: SymptomType[]
   cofactors_in_use: string[]
   safety_flags: string[]
   halogen_exposure: string[]
@@ -233,6 +236,42 @@ function PhaseEducationCard({
   )
 }
 
+const NEED_TONES: Record<PatientNeedTone, string> = {
+  safety: 'bg-red-50 text-red-800 border-red-100',
+  foundation: 'bg-teal-50 text-teal-800 border-teal-100',
+  metabolic: 'bg-sky-50 text-sky-800 border-sky-100',
+  detox: 'bg-amber-50 text-amber-800 border-amber-100',
+  monitoring: 'bg-indigo-50 text-indigo-800 border-indigo-100',
+  maintenance: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+}
+
+const STEP_TONES: Record<ProtocolStepStatus, { dot: string; badge: string; label: string; row: string }> = {
+  done: {
+    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-100',
+    label: 'feito',
+    row: 'bg-emerald-50/40 border-emerald-100',
+  },
+  current: {
+    dot: 'bg-teal-700',
+    badge: 'bg-teal-50 text-teal-800 border-teal-100',
+    label: 'agora',
+    row: 'bg-teal-50 border-teal-100',
+  },
+  next: {
+    dot: 'bg-sky-500',
+    badge: 'bg-sky-50 text-sky-800 border-sky-100',
+    label: 'proximo',
+    row: 'bg-slate-50 border-gray-100',
+  },
+  blocked: {
+    dot: 'bg-red-500',
+    badge: 'bg-red-50 text-red-800 border-red-100',
+    label: 'bloqueado',
+    row: 'bg-red-50/50 border-red-100',
+  },
+}
+
 function BottomNav() {
   const items = [
     { label: 'Dashboard', path: '/dashboard', icon: 'grid' },
@@ -302,7 +341,7 @@ export default async function ProtocolPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('phase, recommended_dose_drops, conditions, cofactors_in_use, safety_flags, halogen_exposure, protocol_risk_level, progression_strategy, protocol_alerts, exam_schedule')
+    .select('phase, recommended_dose_drops, conditions, medications, current_symptoms, cofactors_in_use, safety_flags, halogen_exposure, protocol_risk_level, progression_strategy, protocol_alerts, exam_schedule')
     .eq('user_id', user.id)
     .single<ProfileRow>()
 
@@ -313,6 +352,26 @@ export default async function ProtocolPage() {
   const doseMg = ((profile.recommended_dose_drops ?? 0) * 6.25).toFixed(1)
   const missingCoreCofactors = ['selenio', 'magnesio'].filter((item) => !profile.cofactors_in_use?.includes(item))
   const hasHalogenLoad = (profile.halogen_exposure ?? []).filter((item) => item !== 'unknown').length >= 2
+  const intelligence = buildProtocolIntelligence({
+    phase: profile.phase,
+    riskLevel: profile.protocol_risk_level ?? 'standard',
+    progressionStrategy: profile.progression_strategy ?? 'standard',
+    recommendedDrops: profile.recommended_dose_drops,
+    conditions: profile.conditions ?? [],
+    symptoms: profile.current_symptoms ?? [],
+    medications: profile.medications ?? [],
+    cofactorsInUse: profile.cofactors_in_use ?? [],
+    safetyFlags: profile.safety_flags ?? [],
+    halogenExposure: profile.halogen_exposure ?? [],
+    protocolAlerts: profile.protocol_alerts ?? [],
+    recentSignals: {
+      redDays: 0,
+      yellowDays: 0,
+      hasPalpitations: false,
+      cofactorReadyDays: 0,
+      loggedDays: 0,
+    },
+  })
 
   return (
     <div className="min-h-screen bg-[#F7FAF9] pb-24">
@@ -361,6 +420,54 @@ export default async function ProtocolPage() {
                 ))}
               </div>
             )}
+          </div>
+        </Section>
+
+        <Section title="Framework inteligente">
+          <div className="space-y-4">
+            <div className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-3">
+              <p className="text-sm font-semibold text-teal-950">{intelligence.currentStage.label}</p>
+              <p className="text-xs text-teal-900/80 leading-relaxed mt-1">{intelligence.currentStage.detail}</p>
+              <p className="text-sm font-medium text-teal-900 mt-3">{intelligence.nextBestAction}</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Necessidades do seu perfil</p>
+              <div className="space-y-2">
+                {intelligence.needs.map((need) => (
+                  <div key={need.key} className={`rounded-lg border px-3 py-2 ${NEED_TONES[need.tone]}`}>
+                    <p className="text-xs font-semibold">{need.title}</p>
+                    <p className="text-xs leading-relaxed mt-0.5 opacity-85">{need.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Sistema progressivo em 5 etapas</p>
+              <div className="space-y-2">
+                {intelligence.steps.map((step) => {
+                  const style = STEP_TONES[step.status]
+                  return (
+                    <div key={step.number} className={`rounded-lg border px-3 py-3 ${style.row}`}>
+                      <div className="flex items-start gap-3">
+                        <span className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${style.dot}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-gray-900">{step.number}. {step.title}</p>
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${style.badge}`}>
+                              {style.label}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed mt-1">{step.explanation}</p>
+                          <p className="text-xs font-medium text-gray-700 leading-relaxed mt-2">{step.patientAction}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </Section>
 
