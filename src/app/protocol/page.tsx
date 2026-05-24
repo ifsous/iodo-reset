@@ -420,6 +420,12 @@ export default async function ProtocolPage() {
                 ))}
               </div>
             )}
+            <Link
+              href="/protocol/history"
+              className="block rounded-lg border border-teal-200 bg-white px-3 py-3 text-center text-sm font-medium text-teal-800 transition-colors hover:bg-teal-50"
+            >
+              Ver historico de fase e dose
+            </Link>
           </div>
         </Section>
 

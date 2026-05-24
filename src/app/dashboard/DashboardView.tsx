@@ -487,7 +487,13 @@ const HISTORY_TONES: Record<ProgressHistoryTone, { dot: string; text: string; bg
   },
 }
 
-function ProgressHistoryCard({ data }: { data: DashboardData['progressHistory'] }) {
+function ProgressHistoryCard({
+  data,
+  onOpenProtocolHistory,
+}: {
+  data: DashboardData['progressHistory']
+  onOpenProtocolHistory: () => void
+}) {
   return (
     <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm space-y-4">
       <div>
@@ -526,6 +532,14 @@ function ProgressHistoryCard({ data }: { data: DashboardData['progressHistory'] 
           )
         })}
       </div>
+
+      <button
+        type="button"
+        onClick={onOpenProtocolHistory}
+        className="w-full rounded-lg border border-teal-200 py-3 text-sm font-medium text-teal-800 transition-colors hover:bg-teal-50"
+      >
+        Ver historico de fase e dose
+      </button>
     </div>
   )
 }
@@ -1121,7 +1135,10 @@ export default function DashboardView({ data }: { data: DashboardData }) {
           onOpenProtocol={() => router.push('/protocol')}
         />
 
-        <ProgressHistoryCard data={data.progressHistory} />
+        <ProgressHistoryCard
+          data={data.progressHistory}
+          onOpenProtocolHistory={() => router.push('/protocol/history')}
+        />
 
         {/* Semáforo */}
         <div className="bg-white rounded-lg border border-gray-200/70 p-4 shadow-sm">
